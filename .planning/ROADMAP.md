@@ -38,8 +38,8 @@ Summary checklist:
 
 - [x] **Phase 1 — Domain model and Spring Boot scaffold** — Shared types and runnable empty service
 - [x] **Phase 2 — CSV ingestion, registry, and hierarchy validation** — Data gate before indexing
-- [ ] **Phase 3 — Lexical and semantic indexes** — Lucene (3a) and ONNX embedding store (3b), parallelizable
-- [ ] **Phase 4 — Hybrid merger and hierarchy enrichment** — End-to-end ranking and context
+- [ ] **Phase 3 — Lexical and semantic indexes** — Lucene (3a) **partially done** (per-lang index + `/api/v1/search`); ONNX embedding store (3b) **not started**
+- [ ] **Phase 4 — Hybrid merger and hierarchy enrichment** — RRF + ONNX pending; **hierarchy in JSON** done for lexical hits (2026-04-03)
 - [ ] **Phase 5 — REST API, language handling, reload, and index lifecycle** — MVP shippable surface
 - [ ] **Phase 6 — Quality tuning, observability, and hardening** — Fusion calibration, metrics, analyzer/de compound follow-through
 
@@ -271,7 +271,7 @@ Summary checklist:
 |-------|----------------|--------|-----------|
 | 1. Domain + scaffold | 1/1 | Complete | `hscode-matcher-api/` (2026-04-03) |
 | 2. Ingestion + validation | 1/1 | Complete | XLSX→CSV, registry, integrity (2026-04-03) |
-| 3. Lucene + embeddings | 0/TBD | Not started | — |
+| 3. Lucene + embeddings | partial | In progress | Lucene + GET search (2026-04-03); ONNX TBD |
 | 4. Hybrid + hierarchy | 0/TBD | Not started | — |
 | 5. REST + reload (MVP) | 0/TBD | Not started | — |
 | 6. Tuning + observability | 0/TBD | Not started | — |

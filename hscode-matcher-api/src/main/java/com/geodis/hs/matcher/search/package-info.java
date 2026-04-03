@@ -1,2 +1,2 @@
-/** Lucene, embeddings, and hybrid search — populated from Phase 3 onward. */
+/** Lexical search (Lucene BM25 + fuzzy); hybrid + ONNX in later phases. */
 package com.geodis.hs.matcher.search;

@@ -23,6 +23,9 @@
         <lucene.version>9.12.1</lucene.version>
         <!-- Phase 3b: pin when implementing ONNX embeddings -->
         <onnxruntime.version>1.20.0</onnxruntime.version>
+        <!-- exec-maven-plugin: use -Dexec.in=... -Dexec.out=... (PowerShell-safe; no spaces in one -D). -->
+        <exec.in></exec.in>
+        <exec.out></exec.out>
     </properties>
 
     <dependencies>
@@ -51,10 +54,7 @@
             <artifactId>commons-csv</artifactId>
             <version>1.12.0</version>
         </dependency>
-    </dependencies>
-
-    <!--
-        Phase 3 planned dependencies (not active in Phase 1):
+        <!-- Phase 3a: embedded Lucene (BM25 + fuzzy) -->
         <dependency>
             <groupId>org.apache.lucene</groupId>
             <artifactId>lucene-core</artifactId>
@@ -66,11 +66,19 @@
             <version>${lucene.version}</version>
         </dependency>
         <dependency>
+            <groupId>org.apache.lucene</groupId>
+            <artifactId>lucene-queryparser</artifactId>
+            <version>${lucene.version}</version>
+        </dependency>
+        <!--
+        Phase 3b: ONNX embeddings (add when model is bundled):
+        <dependency>
             <groupId>com.microsoft.onnxruntime</groupId>
             <artifactId>onnxruntime</artifactId>
             <version>${onnxruntime.version}</version>
         </dependency>
-    -->
+        -->
+    </dependencies>
 
     <build>
         <plugins>
@@ -84,8 +92,32 @@
                 <version>3.5.0</version>
                 <configuration>
                     <mainClass>com.geodis.hs.matcher.ingestion.export.ExportNomenclatureCsv</mainClass>
+                    <arguments>
+                        <argument>${exec.in}</argument>
+                        <argument>${exec.out}</argument>
+                    </arguments>
                 </configuration>
             </plugin>
         </plugins>
     </build>
+
+    <!-- PowerShell splits unquoted -Dspring-boot.run.profiles=...; use -Pdev instead. -->
+    <profiles>
+        <profile>
+            <id>dev</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-maven-plugin</artifactId>
+                        <configuration>
+                            <profiles>
+                                <profile>dev</profile>
+                            </profiles>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>
