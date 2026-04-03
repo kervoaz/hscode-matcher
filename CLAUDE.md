@@ -19,11 +19,15 @@ Files are exported from the European Commission CIRCABC platform (circabc.europa
 ## Application code
 
 - `hscode-matcher-api/` — Spring Boot 3.x / Java 17 service (HS code matcher API). Build with `./mvnw test` or `./mvnw package` from that directory.
-- **Nomenclature CSV export (offline):** from `hscode-matcher-api/`, run (works in **PowerShell** without quoting issues):  
-  `mvn -q exec:java -Dexec.in=../NomenclatureEN.XLSX -Dexec.out=../nomenclature-en.csv`  
-  (repeat for FR/DE). Do **not** use a single `-Dexec.args=... ...` unquoted in PowerShell: the space splits the command and Maven treats the second path as a bogus lifecycle phase. If you use one property, quote it: `mvn exec:java "-Dexec.args=../NomenclatureEN.XLSX ../nomenclature-en.csv"`.  
+- **Nomenclature CSV export (offline):** Maven needs a **`pom.xml`**. Either `cd hscode-matcher-api` first, **or** stay at repo root and pass `-f hscode-matcher-api/pom.xml`. The plugin is configured for **`-Dexec.in=...` and `-Dexec.out=...`** (not `exec.args` unless you quote a single combined property).  
+  - From **`hscode-matcher-api/`:**  
+    `mvn -q exec:java -Dexec.in=../NomenclatureFR.XLSX -Dexec.out=../nomenclature-fr.csv`  
+  - From **repo root (`HSCODE/`):**  
+    `mvn -q -f hscode-matcher-api/pom.xml exec:java -Dexec.in=NomenclatureFR.XLSX -Dexec.out=nomenclature-fr.csv`  
+  (paths are relative to the shell’s current directory). Repeat for EN/DE. Do **not** use unquoted `-Dexec.args=... ...` in PowerShell (space splits the line).  
   Set `nomenclature.csv.{en,fr,de}` in `application.properties`, or use Spring profile **`dev`** (`application-dev.properties` loads `../nomenclature-*.csv`). **PowerShell:** run `mvn spring-boot:run -Pdev` from `hscode-matcher-api/` (do not use unquoted `-Dspring-boot.run.profiles=dev` — it breaks like `exec.args`). Quoted form: `mvn spring-boot:run "-Dspring-boot.run.profiles=dev"`. Runtime reads **CSV only** — no XLSX on startup.
-- **Search (Phase 3a lexical + hierarchy):** `GET /api/v1/search?q=...&lang=FR|EN|DE&limit=10` — Lucene BM25 (`SimpleQueryParser`) **OR** per-token `FuzzyQuery` (boosted so typos affect ranking). Response includes **`fuzzyEnabled`** and **`fuzzyTerms`** (tokens with length ≥3 that get a fuzzy clause; very short tokens are skipped). Each hit has `hierarchy` (`chapter`, `heading`, `siblingSubheadings`). **503** if that language has no CSV. **Restart** after analyzer/index changes.
+- **Search (Phase 3a lexical + hierarchy):** `GET /api/v1/search?q=...&lang=FR|EN|DE&limit=10` — Lucene BM25 (`SimpleQueryParser`) **OR** per-token `FuzzyQuery` (boosted). Response includes **`fuzzyEnabled`**, **`fuzzyTerms`**, and **`hierarchy`** per hit. **503** if that language has no CSV loaded.
+- **Reload (Phase 5 slice):** `POST /api/v1/admin/reload` — rebuilds Lucene indexes from current `nomenclature.csv.*` paths (swap atomically; in-flight searches finish on the old snapshot). Optional **`nomenclature.admin.reload-token`**; if set, send header **`X-Reload-Token: <value>`**. JSON: `{ "status": "RELOADED", "anyLanguageReady": true, "error": null }` or `ERROR` with message.
 
 ## Planning (GSD)
 

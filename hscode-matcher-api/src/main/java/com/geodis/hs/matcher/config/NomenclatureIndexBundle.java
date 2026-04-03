@@ -14,28 +14,28 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
-import java.util.Map;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.store.Directory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.DisposableBean;
 
-/** Loads nomenclature CSVs, validates, builds per-language Lucene indexes; closes resources on shutdown. */
-public final class NomenclatureSearchInfrastructure implements DisposableBean {
+/**
+ * One generation of loaded CSVs + Lucene indexes. Close after a newer bundle is published so
+ * in-flight searches can finish on the old snapshot.
+ */
+public final class NomenclatureIndexBundle implements AutoCloseable {
 
-    private static final Logger log = LoggerFactory.getLogger(NomenclatureSearchInfrastructure.class);
+    private static final Logger log = LoggerFactory.getLogger(NomenclatureIndexBundle.class);
 
     private final List<LanguageSearchIndex> indices = new ArrayList<>();
     private final LuceneLexicalSearchService lexicalSearchService;
 
-    private NomenclatureSearchInfrastructure(
-            List<LanguageSearchIndex> indices, LuceneLexicalSearchService lexicalSearchService) {
+    private NomenclatureIndexBundle(List<LanguageSearchIndex> indices, LuceneLexicalSearchService lexical) {
         this.indices.addAll(indices);
-        this.lexicalSearchService = lexicalSearchService;
+        this.lexicalSearchService = lexical;
     }
 
-    public static NomenclatureSearchInfrastructure load(NomenclatureCsvProperties props) throws IOException {
+    public static NomenclatureIndexBundle load(NomenclatureCsvProperties props) throws IOException {
         EnumMap<Language, LanguageSearchIndex> map = new EnumMap<>(Language.class);
         List<LanguageSearchIndex> closeList = new ArrayList<>();
         tryLoad(props.getEn(), Language.EN, map, closeList);
@@ -48,7 +48,7 @@ public final class NomenclatureSearchInfrastructure implements DisposableBean {
         } else {
             log.info("Lucene lexical indexes ready for languages: {}", map.keySet());
         }
-        return new NomenclatureSearchInfrastructure(closeList, service);
+        return new NomenclatureIndexBundle(closeList, service);
     }
 
     private static void tryLoad(
@@ -86,7 +86,7 @@ public final class NomenclatureSearchInfrastructure implements DisposableBean {
     }
 
     @Override
-    public void destroy() throws Exception {
+    public void close() {
         for (LanguageSearchIndex index : indices) {
             try {
                 index.close();

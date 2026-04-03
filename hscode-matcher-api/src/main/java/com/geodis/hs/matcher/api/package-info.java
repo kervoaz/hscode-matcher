@@ -1,2 +1,2 @@
-/** REST API (search MVP; reload in a later phase). */
+/** REST API: search + admin reload. */
 package com.geodis.hs.matcher.api;

@@ -2,7 +2,7 @@ package com.geodis.hs.matcher;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.geodis.hs.matcher.search.lucene.LuceneLexicalSearchService;
+import com.geodis.hs.matcher.config.NomenclatureSearchRuntime;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -11,10 +11,10 @@ import org.springframework.boot.test.context.SpringBootTest;
 class ApplicationContextTest {
 
     @Autowired
-    private LuceneLexicalSearchService lexicalSearchService;
+    private NomenclatureSearchRuntime nomenclatureSearchRuntime;
 
     @Test
-    void contextLoadsAndLexicalBeanPresent() {
-        assertThat(lexicalSearchService).isNotNull();
+    void contextLoadsAndSearchRuntimePresent() {
+        assertThat(nomenclatureSearchRuntime).isNotNull();
     }
 }

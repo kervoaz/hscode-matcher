@@ -40,7 +40,7 @@ Summary checklist:
 - [x] **Phase 2 — CSV ingestion, registry, and hierarchy validation** — Data gate before indexing
 - [ ] **Phase 3 — Lexical and semantic indexes** — Lucene (3a) **partially done** (per-lang index + `/api/v1/search`); ONNX embedding store (3b) **not started**
 - [ ] **Phase 4 — Hybrid merger and hierarchy enrichment** — RRF + ONNX pending; **hierarchy in JSON** done for lexical hits (2026-04-03)
-- [ ] **Phase 5 — REST API, language handling, reload, and index lifecycle** — MVP shippable surface
+- [ ] **Phase 5 — REST API, language handling, reload, and index lifecycle** — `GET /search` done; **`POST /api/v1/admin/reload`** done (2026-04-03); optional token; full orchestration polish TBD
 - [ ] **Phase 6 — Quality tuning, observability, and hardening** — Fusion calibration, metrics, analyzer/de compound follow-through
 
 ---

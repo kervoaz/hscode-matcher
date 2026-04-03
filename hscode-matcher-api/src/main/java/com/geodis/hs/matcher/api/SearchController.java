@@ -3,9 +3,9 @@ package com.geodis.hs.matcher.api;
 import com.geodis.hs.matcher.api.dto.MatchRow;
 import com.geodis.hs.matcher.api.dto.SearchResponse;
 import com.geodis.hs.matcher.domain.Language;
+import com.geodis.hs.matcher.config.NomenclatureSearchRuntime;
 import com.geodis.hs.matcher.search.HierarchyResolver;
 import com.geodis.hs.matcher.search.LexicalHit;
-import com.geodis.hs.matcher.search.lucene.LuceneLexicalSearchService;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -23,10 +23,10 @@ public class SearchController {
 
     private static final int MAX_LIMIT = 50;
 
-    private final LuceneLexicalSearchService lexicalSearch;
+    private final NomenclatureSearchRuntime searchRuntime;
 
-    public SearchController(LuceneLexicalSearchService lexicalSearch) {
-        this.lexicalSearch = lexicalSearch;
+    public SearchController(NomenclatureSearchRuntime searchRuntime) {
+        this.searchRuntime = searchRuntime;
     }
 
     @GetMapping("/search")
@@ -46,14 +46,14 @@ public class SearchController {
             return ResponseEntity.badRequest()
                     .body(new SearchResponse(q.trim(), lang, 0, List.of(), false, 0));
         }
-        if (!lexicalSearch.isReady(language)) {
+        if (!searchRuntime.isReady(language)) {
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                     .body(new SearchResponse(q.trim(), language.name(), 0, List.of(), false, 0));
         }
         int lim = Math.min(Math.max(1, limit), MAX_LIMIT);
-        var outcome = lexicalSearch.search(language, q, lim);
+        var outcome = searchRuntime.search(language, q, lim);
         List<LexicalHit> hits = outcome.hits();
-        var reg = lexicalSearch.registry(language).orElseThrow();
+        var reg = searchRuntime.registry(language).orElseThrow();
         List<MatchRow> rows = new ArrayList<>(hits.size());
         for (LexicalHit h : hits) {
             var e = h.entry();
