@@ -1,0 +1,9 @@
+# Maven
+hscode-matcher-api/target/
+**/.flattened-pom.xml
+
+# IDE / OS
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
