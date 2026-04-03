@@ -1,5 +1,7 @@
 package com.geodis.hs.matcher.ingestion;
 
+import java.util.Optional;
+
 /**
  * Parses EU TARIC/CN "Goods code" cells (10-digit base plus optional suffix such as {@code " 80"}).
  *
@@ -81,5 +83,29 @@ public final class GoodsCodes {
 
     public static boolean isValidHsKey(String code) {
         return code != null && code.matches("\\d{2}|\\d{4}|\\d{6}");
+    }
+
+    /**
+     * Normalizes user or URL input to an HS registry key (2, 4, or 6 digits). Strips all
+     * non-digits (dots, spaces, etc.).
+     *
+     * @return empty if there are no digits or the digit count is not valid for HS v1
+     */
+    public static Optional<String> normalizeLookupCode(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return Optional.empty();
+        }
+        StringBuilder digits = new StringBuilder(raw.length());
+        for (int i = 0; i < raw.length(); i++) {
+            char c = raw.charAt(i);
+            if (c >= '0' && c <= '9') {
+                digits.append(c);
+            }
+        }
+        String s = digits.toString();
+        if (!isValidHsKey(s)) {
+            return Optional.empty();
+        }
+        return Optional.of(s);
     }
 }

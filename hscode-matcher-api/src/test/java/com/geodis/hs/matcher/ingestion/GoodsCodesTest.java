@@ -44,4 +44,20 @@ class GoodsCodesTest {
         assertThat(GoodsCodes.isValidHsKey("01012")).isFalse();
         assertThat(GoodsCodes.isValidHsKey("0101210")).isFalse();
     }
+
+    @Test
+    void normalizeLookupCode_stripsNonDigits() {
+        assertThat(GoodsCodes.normalizeLookupCode("01")).contains("01");
+        assertThat(GoodsCodes.normalizeLookupCode("0101.21")).contains("010121");
+        assertThat(GoodsCodes.normalizeLookupCode(" 8703 ")).contains("8703");
+    }
+
+    @Test
+    void normalizeLookupCode_rejectsInvalidLengths() {
+        assertThat(GoodsCodes.normalizeLookupCode("")).isEmpty();
+        assertThat(GoodsCodes.normalizeLookupCode("abc")).isEmpty();
+        assertThat(GoodsCodes.normalizeLookupCode("1")).isEmpty();
+        assertThat(GoodsCodes.normalizeLookupCode("123")).isEmpty();
+        assertThat(GoodsCodes.normalizeLookupCode("12345")).isEmpty();
+    }
 }
