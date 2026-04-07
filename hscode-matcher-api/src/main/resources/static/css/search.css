@@ -1,0 +1,383 @@
+:root {
+  --bg: #0f1419;
+  --surface: #1a2332;
+  --border: #2d3a4f;
+  --text: #e7ecf3;
+  --muted: #8b9cb3;
+  --accent: #3d8bfd;
+  --accent-dim: #2a5fad;
+  --success: #3fb950;
+  --warn: #d29922;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.45;
+}
+
+.wrap {
+  max-width: 52rem;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 3rem;
+}
+
+header h1 {
+  font-size: 1.35rem;
+  font-weight: 600;
+  margin: 0 0 0.25rem;
+}
+
+header p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+  margin: 1.25rem 0 0.5rem;
+}
+
+.toolbar label {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.toolbar select {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.35rem 0.5rem;
+}
+
+.lab-panel {
+  margin: 1rem 0;
+  padding: 0.75rem 1rem;
+  background: rgba(26, 35, 50, 0.85);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.88rem;
+}
+
+.lab-panel summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.lab-panel[open] summary {
+  margin-bottom: 0.65rem;
+}
+
+.lab-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.lab-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.lab-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  cursor: pointer;
+  color: var(--text);
+}
+
+.lab-check input {
+  margin-top: 0.2rem;
+  flex-shrink: 0;
+}
+
+.lab-field-label {
+  font-size: 0.88rem;
+  color: var(--text);
+  font-weight: 500;
+}
+
+.lab-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  color: var(--muted);
+}
+
+.lab-field input[type="number"] {
+  max-width: 8rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+}
+
+.lab-field code,
+.lab-help code {
+  font-size: 0.85em;
+  color: var(--accent);
+}
+
+.lab-help {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+  line-height: 1.45;
+  max-width: 42rem;
+}
+
+.toolbar-help {
+  margin: 0.35rem 0 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+  line-height: 1.45;
+  max-width: 42rem;
+}
+
+.search-help {
+  margin: 0.35rem 0 0.25rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.lab-hint {
+  margin: 0.75rem 0 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.lab-intro {
+  margin-top: 0;
+}
+
+.lab-hint code {
+  font-size: 0.85em;
+  color: var(--accent);
+}
+
+.search-row {
+  position: relative;
+  margin-bottom: 0.5rem;
+}
+
+#q {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  outline: none;
+}
+
+#q:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(61, 139, 253, 0.25);
+}
+
+.suggestions {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  margin-top: 4px;
+  max-height: 14rem;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  z-index: 10;
+  display: none;
+}
+
+.suggestions.visible {
+  display: block;
+}
+
+.suggestions button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.55rem 0.85rem;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.9rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.suggestions button:last-child {
+  border-bottom: none;
+}
+
+.suggestions button:hover,
+.suggestions button:focus {
+  background: rgba(61, 139, 253, 0.12);
+  outline: none;
+}
+
+.suggestions .code {
+  font-family: ui-monospace, monospace;
+  color: var(--accent);
+  margin-right: 0.5rem;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  align-items: center;
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin: 0.75rem 0 1rem;
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.badge.hybrid {
+  background: rgba(63, 185, 80, 0.2);
+  color: var(--success);
+}
+
+.badge.fuzzy {
+  background: rgba(210, 153, 34, 0.2);
+  color: var(--warn);
+}
+
+.error {
+  color: #f85149;
+  font-size: 0.9rem;
+  margin: 0.5rem 0;
+}
+
+.results {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+  background: rgba(26, 35, 50, 0.6);
+}
+
+.card .title {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: baseline;
+  margin-bottom: 0.35rem;
+}
+
+.card .title code {
+  font-size: 1rem;
+  color: var(--accent);
+  background: rgba(61, 139, 253, 0.1);
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+}
+
+.card .desc {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.card .hier {
+  margin: 0.5rem 0 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.card .foot {
+  margin-top: 0.45rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.empty {
+  color: var(--muted);
+  font-style: italic;
+  margin: 1rem 0;
+}
+
+.explain-wrap {
+  margin: 1rem 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
+  background: rgba(26, 35, 50, 0.5);
+}
+
+.explain-wrap summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.explain-pre {
+  margin: 0.5rem 0 0;
+  max-height: 22rem;
+  overflow: auto;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: var(--muted);
+}
+
+.ab-panel {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+@media (max-width: 52rem) {
+  .ab-panel {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ab-col {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.75rem;
+  background: rgba(26, 35, 50, 0.35);
+}
+
+.ab-title {
+  font-size: 0.95rem;
+  margin: 0 0 0.5rem;
+  color: var(--accent);
+}
+
+.ab-meta {
+  margin-bottom: 0.65rem;
+}

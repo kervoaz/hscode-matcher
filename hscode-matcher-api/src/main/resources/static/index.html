@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>HS Matcher — recherche nomenclature</title>
+    <link rel="stylesheet" href="/css/search.css" />
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <h1>Recherche nomenclature HS</h1>
+        <p>
+          Saisie continue : résultats mis à jour automatiquement. Cliquez une
+          suggestion pour remplir le champ.
+        </p>
+      </header>
+
+      <div class="toolbar">
+        <div>
+          <label for="lang">Langue</label>
+          <select
+            id="lang"
+            aria-label="Langue de la nomenclature"
+            aria-describedby="help-lang"
+          >
+            <option value="FR">FR</option>
+            <option value="EN">EN</option>
+            <option value="DE">DE</option>
+          </select>
+          <p id="help-lang" class="toolbar-help">
+            Nomenclature chargée côté serveur pour cette langue (paramètre API
+            <code>lang</code>). Les libellés et l’index Lucene correspondent à
+            l’export CSV de la même langue.
+          </p>
+        </div>
+      </div>
+
+      <details class="lab-panel">
+        <summary>Options de test (lab)</summary>
+        <p class="lab-hint lab-intro">
+          Ces réglages s’appliquent aux appels <code>GET /api/v1/search</code>
+          depuis cette page. Les cases et champs vides laissent le comportement
+          par défaut du serveur.
+        </p>
+        <div class="lab-grid">
+          <div class="lab-item">
+            <label class="lab-check" for="lab-hybrid">
+              <input
+                type="checkbox"
+                id="lab-hybrid"
+                checked
+                aria-describedby="help-lab-hybrid"
+              />
+              <span>Autoriser hybrid ONNX (RRF)</span>
+            </label>
+            <p id="help-lab-hybrid" class="lab-help">
+              Si décoché, chaque recherche envoie <code>hybrid=false</code> :
+              pas d’embedding de la requête ni fusion RRF — uniquement la
+              recherche lexicale (Lucene). Utile pour comparer avec le mode
+              sémantique.
+            </p>
+          </div>
+
+          <div class="lab-item">
+            <div class="lab-field">
+              <span class="lab-field-label" id="label-lab-hybrid-min-len"
+                >Hybrid côté client (longueur minimale)</span
+              >
+              <input
+                type="number"
+                id="lab-hybrid-min-len"
+                min="0"
+                max="50"
+                value="0"
+                aria-labelledby="label-lab-hybrid-min-len"
+                aria-describedby="help-lab-hybrid-min-len"
+              />
+            </div>
+            <p id="help-lab-hybrid-min-len" class="lab-help">
+              Tant que la requête (après espaces en trop retirés) a moins de
+              <em>N</em> caractères, la page envoie <code>hybrid=false</code>
+              même si la case hybrid est cochée — pour éviter l’embedding sur
+              des toutes petites saisies. <strong>0</strong> = pas de garde
+              côté navigateur (seul le serveur peut encore couper via
+              <em>seuil hybrid serveur</em>).
+            </p>
+          </div>
+
+          <div class="lab-item">
+            <div class="lab-field">
+              <span class="lab-field-label" id="label-lab-limit"
+                >Limite résultats API</span
+              >
+              <input
+                type="number"
+                id="lab-limit"
+                min="1"
+                max="50"
+                value="20"
+                aria-labelledby="label-lab-limit"
+                aria-describedby="help-lab-limit"
+              />
+            </div>
+            <p id="help-lab-limit" class="lab-help">
+              Paramètre <code>limit</code> : nombre maximum de codes renvoyés
+              dans la réponse (plafonné à 50 par l’API). Plus la valeur est
+              élevée, plus le calcul (et le JSON) peuvent être lourds.
+            </p>
+          </div>
+
+          <div class="lab-item">
+            <label class="lab-check" for="lab-fuzzy">
+              <input
+                type="checkbox"
+                id="lab-fuzzy"
+                checked
+                aria-describedby="help-lab-fuzzy"
+              />
+              <span>Fuzzy Lucene</span>
+            </label>
+            <p id="help-lab-fuzzy" class="lab-help">
+              Active les requêtes <em>fuzzy</em> sur les tokens (tolérance aux
+              fautes de frappe) en plus du BM25. Décoché →
+              <code>fuzzy=false</code> : seule la partie « plein texte » Lucene
+              reste.
+            </p>
+          </div>
+
+          <div class="lab-item">
+            <div class="lab-field">
+              <span class="lab-field-label" id="label-lab-min-fuzzy-tokens"
+                >Longueur minimale des tokens pour le fuzzy</span
+              >
+              <input
+                type="number"
+                id="lab-min-fuzzy-tokens"
+                min="0"
+                max="32"
+                placeholder="—"
+                aria-labelledby="label-lab-min-fuzzy-tokens"
+                aria-describedby="help-lab-min-fuzzy-tokens"
+              />
+            </div>
+            <p id="help-lab-min-fuzzy-tokens" class="lab-help">
+              Paramètre <code>minFuzzyTokenLength</code> : un token analysé plus
+              court que cette valeur ne reçoit pas de clause fuzzy. Champ vide
+              ou 0 → défaut serveur (3). Valeurs possibles 2–32. Plus le seuil
+              est haut, moins il y a de fuzzy (moins de bruit, moins de rappel).
+            </p>
+          </div>
+
+          <div class="lab-item">
+            <label class="lab-check" for="lab-explain">
+              <input
+                type="checkbox"
+                id="lab-explain"
+                aria-describedby="help-lab-explain"
+              />
+              <span>Mode explain</span>
+            </label>
+            <p id="help-lab-explain" class="lab-help">
+              Envoie <code>explain=true</code>. La réponse JSON contient alors
+              les rangs <strong>lexical</strong> et <strong>sémantique</strong>
+              (avant fusion) et les lignes de <strong>fusion RRF</strong> — pour
+              comprendre d’où viennent les codes affichés. Données plafonnées
+              côté serveur.
+            </p>
+          </div>
+
+          <div class="lab-item">
+            <div class="lab-field">
+              <span class="lab-field-label" id="label-lab-min-hybrid-server"
+                >Seuil hybrid côté serveur (caractères)</span
+              >
+              <input
+                type="number"
+                id="lab-min-hybrid-server"
+                min="0"
+                max="256"
+                placeholder="—"
+                aria-labelledby="label-lab-min-hybrid-server"
+                aria-describedby="help-lab-min-hybrid-server"
+              />
+            </div>
+            <p id="help-lab-min-hybrid-server" class="lab-help">
+              Paramètre <code>minHybridChars</code> : l’API refuse l’hybrid
+              (embedding + RRF) si la requête tronquée fait moins de
+              <em>N</em> caractères. Champ vide → valeur de
+              <code>hs.matcher.hybrid.min-query-chars</code> dans
+              <code>application.properties</code>. <strong>0</strong> = pas de
+              seuil longueur côté API pour cet appel. Visible dans
+              <code>debug.serverMinHybridQueryChars</code>.
+            </p>
+          </div>
+
+          <div class="lab-item">
+            <div class="lab-field">
+              <span class="lab-field-label" id="label-lab-embed-timeout"
+                >Timeout embedding (ms)</span
+              >
+              <input
+                type="number"
+                id="lab-embed-timeout"
+                min="0"
+                max="120000"
+                placeholder="—"
+                aria-labelledby="label-lab-embed-timeout"
+                aria-describedby="help-lab-embed-timeout"
+              />
+            </div>
+            <p id="help-lab-embed-timeout" class="lab-help">
+              Paramètre <code>embedTimeoutMs</code> : durée max pour calculer
+              le vecteur de la requête ONNX. Dépassement → retour lexical,
+              <code>debug.embeddingTimedOut</code>, compteur métrique
+              <code>hs.matcher.embed</code> (outcome=timeout). Vide →
+              <code>hs.matcher.embed.timeout-ms</code> (0 = pas de timeout).
+            </p>
+          </div>
+
+          <div class="lab-item">
+            <div class="lab-field">
+              <span class="lab-field-label" id="label-lab-debounce"
+                >Debounce (ms)</span
+              >
+              <input
+                type="number"
+                id="lab-debounce"
+                min="0"
+                max="2000"
+                value="280"
+                aria-labelledby="label-lab-debounce"
+                aria-describedby="help-lab-debounce"
+              />
+            </div>
+            <p id="help-lab-debounce" class="lab-help">
+              Délai après la dernière frappe avant d’appeler l’API. Réduit le
+              nombre de requêtes pendant la saisie rapide ; un délai plus long
+              rend l’interface plus « calme » mais moins réactive.
+            </p>
+          </div>
+
+          <div class="lab-item">
+            <div class="lab-field">
+              <span class="lab-field-label" id="label-lab-rrf-k"
+                >RRF <code>k</code></span
+              >
+              <input
+                type="number"
+                id="lab-rrf-k"
+                min="5"
+                max="200"
+                placeholder="—"
+                aria-labelledby="label-lab-rrf-k"
+                aria-describedby="help-lab-rrf-k"
+              />
+            </div>
+            <p id="help-lab-rrf-k" class="lab-help">
+              Paramètre <code>rrfK</code> : constante <em>k</em> de la fusion
+              reciprocal rank fusion entre liste lexicale et liste sémantique.
+              Plus <em>k</em> est grand, plus les rangs profonds comptent
+              faiblement. Vide → <code>hs.matcher.hybrid.rrf-k</code>. Réponse
+              : <code>effectiveRrfK</code>.
+            </p>
+          </div>
+
+          <div class="lab-item">
+            <div class="lab-field">
+              <span class="lab-field-label" id="label-lab-pool-mult"
+                >Multiplicateur pool lexical</span
+              >
+              <input
+                type="number"
+                id="lab-pool-mult"
+                min="1"
+                max="24"
+                placeholder="—"
+                aria-labelledby="label-lab-pool-mult"
+                aria-describedby="help-lab-pool-mult"
+              />
+            </div>
+            <p id="help-lab-pool-mult" class="lab-help">
+              Paramètre <code>poolMultiplier</code> : taille du pool de candidats
+              (lexical puis sémantique) avant la fusion, dérivée de
+              <code>limit</code> × multiplicateur, plafonnée côté serveur (200).
+              Plus le pool est grand, plus le hybrid voit de codes mais le coût
+              augmente. Vide →
+              <code>hs.matcher.hybrid.lexical-pool-multiplier</code>.
+            </p>
+          </div>
+
+          <div class="lab-item">
+            <label class="lab-check" for="lab-ab">
+              <input type="checkbox" id="lab-ab" aria-describedby="help-lab-ab" />
+              <span>Vue A/B (<code>hybrid=true</code> vs <code>hybrid=false</code>)</span>
+            </label>
+            <p id="help-lab-ab" class="lab-help">
+              Lance <strong>deux</strong> requêtes en parallèle avec les mêmes
+              autres paramètres : une avec hybrid autorisé, une en lexical pur.
+              Affiche deux colonnes pour comparer les classements. La liste de
+              suggestions sous le champ utilise toujours le mode « auto » (hybrid
+              selon les cases ci-dessus).
+            </p>
+          </div>
+        </div>
+        <p class="lab-hint">
+          Référence rapide : métriques d’échec d’embedding
+          <code>GET /actuator/metrics/hs.matcher.embed</code> ; détails de
+          requête dans <code>debug</code> et <code>explain</code> (si activé)
+          dans le JSON de réponse.
+        </p>
+      </details>
+
+      <p id="help-search-q" class="search-help">
+        Recherche libre sur code HS ou libellé (paramètre <code>q</code>). Au
+        moins 2 caractères pour interroger l’API. Les suggestions reprennent les
+        premiers résultats renvoyés.
+      </p>
+      <div class="search-row">
+        <input
+          type="search"
+          id="q"
+          name="q"
+          autocomplete="off"
+          placeholder="Code HS ou description (ex. café, 0901)…"
+          aria-label="Recherche"
+          aria-describedby="help-search-q"
+          aria-autocomplete="list"
+          aria-controls="suggestions"
+        />
+        <div
+          id="suggestions"
+          class="suggestions"
+          role="listbox"
+          aria-label="Suggestions"
+        ></div>
+      </div>
+
+      <div id="meta" class="meta"></div>
+      <div id="error" class="error" role="alert"></div>
+
+      <details id="explain-wrap" class="explain-wrap" hidden>
+        <summary>Explain JSON</summary>
+        <pre id="explain-pre" class="explain-pre"></pre>
+      </details>
+
+      <div id="ab-panel" class="ab-panel" hidden>
+        <div class="ab-col">
+          <h2 class="ab-title">hybrid autorisé</h2>
+          <div id="ab-meta-hybrid" class="meta ab-meta"></div>
+          <div id="ab-results-hybrid" class="results"></div>
+        </div>
+        <div class="ab-col">
+          <h2 class="ab-title">hybrid=false (lexical)</h2>
+          <div id="ab-meta-lexical" class="meta ab-meta"></div>
+          <div id="ab-results-lexical" class="results"></div>
+        </div>
+      </div>
+
+      <div id="results" class="results"></div>
+    </div>
+    <script src="/js/search.js" defer></script>
+  </body>
+</html>

@@ -1,0 +1,16 @@
+# Maven
+hscode-matcher-api/target/
+**/.flattened-pom.xml
+
+# ONNX model weights (optional; download for local embedding tests — see CLAUDE.md)
+hscode-matcher-api/src/main/resources/onnx/*.onnx
+hscode-matcher-api/src/test/resources/onnx/*.onnx
+# Local embedding disk cache (optional hs.matcher.embedding.cache-dir)
+hscode-matcher-api/var/
+hscode-matcher-api/tmp/
+
+# IDE / OS
+.idea/
+*.iml
+.DS_Store
+Thumbs.db

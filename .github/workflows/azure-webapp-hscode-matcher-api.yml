@@ -1,0 +1,49 @@
+# Déploie le JAR hscode-matcher-api vers une Azure Web App (Linux, Java).
+#
+# Secrets :
+#   AZURE_WEBAPP_NAME              — nom de la Web App
+#   AZURE_WEBAPP_PUBLISH_PROFILE   — XML du profil de publication
+#
+name: Deploy HS Code Matcher API to Azure Web App
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+      - main
+    paths:
+      - "hscode-matcher-api/**"
+      - ".github/workflows/azure-webapp-hscode-matcher-api.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: "17"
+          distribution: "temurin"
+          cache: maven
+
+      - name: Build with Maven
+        run: mvn -B -DskipTests package --file hscode-matcher-api/pom.xml
+
+      - name: Resolve JAR path
+        id: jar
+        run: |
+          JAR=$(ls -1 hscode-matcher-api/target/hscode-matcher-api-*.jar | grep -v '\.original$' | head -1)
+          echo "path=$JAR" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ secrets.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: ${{ steps.jar.outputs.path }}
