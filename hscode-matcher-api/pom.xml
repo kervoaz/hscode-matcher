@@ -21,8 +21,6 @@
         <java.version>17</java.version>
         <!-- Phase 3a: pin when implementing Lucene indexes -->
         <lucene.version>9.12.1</lucene.version>
-        <!-- Phase 3b: pin when implementing ONNX embeddings -->
-        <onnxruntime.version>1.20.0</onnxruntime.version>
         <!-- exec-maven-plugin: use -Dexec.in=... -Dexec.out=... (PowerShell-safe; no spaces in one -D). -->
         <exec.in></exec.in>
         <exec.out></exec.out>
@@ -70,14 +68,6 @@
             <artifactId>lucene-queryparser</artifactId>
             <version>${lucene.version}</version>
         </dependency>
-        <!--
-        Phase 3b: ONNX embeddings (add when model is bundled):
-        <dependency>
-            <groupId>com.microsoft.onnxruntime</groupId>
-            <artifactId>onnxruntime</artifactId>
-            <version>${onnxruntime.version}</version>
-        </dependency>
-        -->
     </dependencies>
 
     <build>

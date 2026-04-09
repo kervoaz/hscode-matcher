@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>HS Matcher — test API</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --panel: #1a2332;
+      --border: #2d3a4d;
+      --text: #e7ecf3;
+      --muted: #8b9cb3;
+      --accent: #4c9ed9;
+      --ok: #3d9970;
+      --err: #c44c4c;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      line-height: 1.45;
+      font-size: 15px;
+    }
+    header {
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel);
+    }
+    header h1 { margin: 0 0 0.35rem; font-size: 1.25rem; font-weight: 600; }
+    header p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+    main { max-width: 960px; margin: 0 auto; padding: 1.25rem 1.5rem 2rem; }
+    section {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 1rem;
+    }
+    section h2 {
+      margin: 0 0 0.75rem;
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--accent);
+    }
+    label { display: block; margin-bottom: 0.2rem; color: var(--muted); font-size: 0.85rem; }
+    .row { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: flex-end; margin-bottom: 0.75rem; }
+    .field { flex: 1; min-width: 140px; }
+    input[type="text"], input[type="number"], select {
+      width: 100%;
+      padding: 0.45rem 0.6rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg);
+      color: var(--text);
+    }
+    button {
+      padding: 0.5rem 1rem;
+      border: none;
+      border-radius: 6px;
+      background: var(--accent);
+      color: #fff;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:hover { filter: brightness(1.08); }
+    button.secondary { background: var(--border); color: var(--text); }
+    button.danger { background: var(--err); }
+    pre {
+      margin: 0;
+      padding: 0.85rem;
+      background: var(--bg);
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      overflow: auto;
+      max-height: 420px;
+      font-size: 12px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .meta { font-size: 0.85rem; color: var(--muted); margin-bottom: 0.5rem; }
+    .status { font-weight: 600; }
+    .status.ok { color: var(--ok); }
+    .status.err { color: var(--err); }
+    .hits { margin-top: 0.75rem; }
+    .hit {
+      border-left: 3px solid var(--accent);
+      padding: 0.5rem 0 0.5rem 0.75rem;
+      margin-bottom: 0.5rem;
+      background: rgba(0,0,0,0.2);
+      border-radius: 0 6px 6px 0;
+    }
+    .hit code { color: #9cdcfe; }
+    .breadcrumb { font-size: 0.8rem; color: var(--muted); margin-top: 0.25rem; }
+    details.tuning-details {
+      margin-top: 0.5rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.5rem 0.75rem;
+      background: rgba(0,0,0,0.15);
+    }
+    details.tuning-details summary {
+      cursor: pointer;
+      color: var(--muted);
+      font-size: 0.9rem;
+      user-select: none;
+    }
+    details.tuning-details[open] summary { margin-bottom: 0.65rem; }
+    .tuning-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 0.65rem;
+    }
+    .check-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.35rem 0;
+    }
+    .check-row input[type="checkbox"] { width: auto; accent-color: var(--accent); }
+    .check-row label { margin: 0; color: var(--text); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>HS Code Matcher — console de test</h1>
+    <p>Recherche lexicale Lucene et hiérarchie — même origine que l’API (<code>/api/v1/…</code>).</p>
+  </header>
+  <main>
+    <section id="search-section">
+      <h2>Recherche</h2>
+      <div class="row">
+        <div class="field" style="flex: 2; min-width: 200px;">
+          <label for="q">Requête <code>q</code></label>
+          <input type="text" id="q" placeholder="ex. café, wheat, Stahl" autocomplete="off" />
+        </div>
+        <div class="field" style="max-width: 100px;">
+          <label for="lang-s">Langue</label>
+          <select id="lang-s">
+            <option value="FR">FR</option>
+            <option value="EN">EN</option>
+            <option value="DE">DE</option>
+          </select>
+        </div>
+        <div class="field" style="max-width: 90px;">
+          <label for="limit"><code>limit</code></label>
+          <input type="number" id="limit" value="10" min="1" max="50" />
+        </div>
+        <button type="button" id="btn-search">GET /search</button>
+      </div>
+      <details class="tuning-details" id="tuning-details">
+        <summary>Paramètres Lucene (fuzzy / BM25)</summary>
+        <div class="check-row">
+          <input type="checkbox" id="t-fuzzy" checked />
+          <label for="t-fuzzy"><code>fuzzy</code> — requêtes floues par token</label>
+        </div>
+        <div class="check-row">
+          <input type="checkbox" id="t-bm25" checked />
+          <label for="t-bm25"><code>bm25</code> — <code>SimpleQueryParser</code> sur la description</label>
+        </div>
+        <div class="tuning-grid">
+          <div class="field">
+            <label for="t-fuzzyBoost"><code>fuzzyBoost</code></label>
+            <input type="number" id="t-fuzzyBoost" value="4" min="0.25" max="32" step="0.25" />
+          </div>
+          <div class="field">
+            <label for="t-minFuzzyTokenLength"><code>minFuzzyTokenLength</code></label>
+            <input type="number" id="t-minFuzzyTokenLength" value="3" min="1" max="20" step="1" />
+          </div>
+          <div class="field">
+            <label for="t-fuzzyMaxExpansions"><code>fuzzyMaxExpansions</code></label>
+            <input type="number" id="t-fuzzyMaxExpansions" value="120" min="1" max="500" step="1" />
+          </div>
+          <div class="field">
+            <label for="t-fuzzyPrefixLength"><code>fuzzyPrefixLength</code></label>
+            <input type="number" id="t-fuzzyPrefixLength" value="1" min="0" max="2" step="1" />
+          </div>
+          <div class="field">
+            <label for="t-maxEditsShort"><code>maxEditsShort</code> (token &lt; 6)</label>
+            <input type="number" id="t-maxEditsShort" value="1" min="0" max="2" step="1" />
+          </div>
+          <div class="field">
+            <label for="t-maxEditsLong"><code>maxEditsLong</code> (token ≥ 6)</label>
+            <input type="number" id="t-maxEditsLong" value="2" min="0" max="2" step="1" />
+          </div>
+          <div class="field">
+            <label for="t-maxQueryChars"><code>maxQueryChars</code></label>
+            <input type="number" id="t-maxQueryChars" value="512" min="32" max="512" step="1" />
+          </div>
+        </div>
+        <div class="row" style="margin-top:0.75rem; margin-bottom:0;">
+          <button type="button" class="secondary" id="btn-tuning-reset">Réinitialiser les défauts</button>
+        </div>
+      </details>
+      <div class="meta" id="search-meta"></div>
+      <div class="hits" id="search-hits" hidden></div>
+      <pre id="search-json" hidden></pre>
+    </section>
+
+    <section id="lookup-section">
+      <h2>Lookup code</h2>
+      <div class="row">
+        <div class="field" style="flex: 1; min-width: 160px;">
+          <label for="code">Code HS (2, 4 ou 6 chiffres)</label>
+          <input type="text" id="code" placeholder="010121 ou 01.01.21" autocomplete="off" />
+        </div>
+        <div class="field" style="max-width: 100px;">
+          <label for="lang-l">Langue</label>
+          <select id="lang-l">
+            <option value="FR">FR</option>
+            <option value="EN">EN</option>
+            <option value="DE">DE</option>
+          </select>
+        </div>
+        <button type="button" id="btn-lookup">GET /codes/…</button>
+      </div>
+      <div class="meta" id="lookup-meta"></div>
+      <div id="lookup-summary" hidden></div>
+      <pre id="lookup-json" hidden></pre>
+    </section>
+
+    <section id="reload-section">
+      <h2>Admin — rechargement index</h2>
+      <p class="meta" style="margin-top:0">POST <code>/api/v1/admin/reload</code>. Si <code>nomenclature.admin.reload-token</code> est défini, renseignez l’en-tête.</p>
+      <div class="row">
+        <div class="field" style="flex: 1;">
+          <label for="reload-token"><code>X-Reload-Token</code> (optionnel)</label>
+          <input type="text" id="reload-token" placeholder="vide si non configuré" autocomplete="off" />
+        </div>
+        <button type="button" class="danger" id="btn-reload">POST /admin/reload</button>
+      </div>
+      <div class="meta" id="reload-meta"></div>
+      <pre id="reload-json" hidden></pre>
+    </section>
+  </main>
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    function defaultTuning() {
+      $("t-fuzzy").checked = true;
+      $("t-bm25").checked = true;
+      $("t-fuzzyBoost").value = "4";
+      $("t-minFuzzyTokenLength").value = "3";
+      $("t-fuzzyMaxExpansions").value = "120";
+      $("t-fuzzyPrefixLength").value = "1";
+      $("t-maxEditsShort").value = "1";
+      $("t-maxEditsLong").value = "2";
+      $("t-maxQueryChars").value = "512";
+    }
+    $("btn-tuning-reset").addEventListener("click", defaultTuning);
+
+    function buildSearchQueryParams() {
+      const p = new URLSearchParams();
+      p.set("q", $("q").value.trim());
+      p.set("lang", $("lang-s").value);
+      p.set("limit", $("limit").value || "10");
+      p.set("fuzzy", String($("t-fuzzy").checked));
+      p.set("bm25", String($("t-bm25").checked));
+      p.set("fuzzyBoost", $("t-fuzzyBoost").value);
+      p.set("minFuzzyTokenLength", $("t-minFuzzyTokenLength").value);
+      p.set("fuzzyMaxExpansions", $("t-fuzzyMaxExpansions").value);
+      p.set("fuzzyPrefixLength", $("t-fuzzyPrefixLength").value);
+      p.set("maxEditsShort", $("t-maxEditsShort").value);
+      p.set("maxEditsLong", $("t-maxEditsLong").value);
+      p.set("maxQueryChars", $("t-maxQueryChars").value);
+      return p;
+    }
+
+    function fmtHierarchy(h) {
+      if (!h) return "";
+      const parts = [];
+      if (h.chapter) parts.push(h.chapter.code + " — " + h.chapter.description);
+      if (h.heading) parts.push(h.heading.code + " — " + h.heading.description);
+      return parts.join(" → ");
+    }
+
+    async function runSearch() {
+      const q = $("q").value.trim();
+      $("search-meta").textContent = "";
+      $("search-hits").hidden = true;
+      $("search-json").hidden = true;
+      if (!q) {
+        $("search-meta").innerHTML = '<span class="status err">Requête vide</span>';
+        return;
+      }
+      if (!$("t-fuzzy").checked && !$("t-bm25").checked) {
+        $("search-meta").innerHTML =
+          '<span class="status err">Activez au moins <code>fuzzy</code> ou <code>bm25</code></span>';
+        return;
+      }
+      const url = "/api/v1/search?" + buildSearchQueryParams().toString();
+      $("search-meta").textContent = "GET " + url;
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+        $("search-json").textContent = JSON.stringify(data, null, 2);
+        $("search-json").hidden = false;
+        let extra = "";
+        if (res.ok && data.tuning) {
+          const t = data.tuning;
+          extra =
+            " — <span title=\"tuning appliqué (voir JSON)\">fuzzy:" + t.fuzzy +
+            " bm25:" + t.bm25 + " boost:" + t.fuzzyBoost + "</span>";
+        }
+        $("search-meta").innerHTML =
+          '<span class="status ' + (res.ok ? "ok" : "err") + '">' + res.status + " " + res.statusText + "</span>" +
+          (res.ok
+            ? " — clauses fuzzy (requête): " + data.fuzzyEnabled + ", termes: " + data.fuzzyTerms
+            : "") +
+          extra;
+        if (!res.ok) {
+          const errMsg = data.detail || data.message || data.title;
+          if (errMsg) {
+            $("search-meta").innerHTML +=
+              ' — <span class="status err">' + escapeHtml(errMsg) + "</span>";
+          }
+        }
+        if (res.ok && Array.isArray(data.results) && data.results.length) {
+          $("search-hits").innerHTML = data.results.map((r) => {
+            const bc = fmtHierarchy(r.hierarchy);
+            return (
+              '<div class="hit"><strong><code>' + escapeHtml(r.code) + "</code></strong> " +
+              "(niveau " + r.level + ", score " + (typeof r.score === "number" ? r.score.toFixed(4) : r.score) + ", " +
+              escapeHtml(r.matchType) + ")<br/>" + escapeHtml(r.description) +
+              (bc ? '<div class="breadcrumb">' + escapeHtml(bc) + "</div>" : "") +
+              "</div>"
+            );
+          }).join("");
+          $("search-hits").hidden = false;
+        }
+      } catch (e) {
+        $("search-meta").innerHTML = '<span class="status err">Erreur réseau</span>';
+        $("search-json").textContent = String(e);
+        $("search-json").hidden = false;
+      }
+    }
+
+    $("btn-search").addEventListener("click", runSearch);
+    $("q").addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter") runSearch();
+    });
+
+    $("btn-lookup").addEventListener("click", async () => {
+      const code = $("code").value.trim();
+      const lang = $("lang-l").value;
+      $("lookup-meta").textContent = "";
+      $("lookup-summary").hidden = true;
+      $("lookup-json").hidden = true;
+      if (!code) {
+        $("lookup-meta").innerHTML = '<span class="status err">Code vide</span>';
+        return;
+      }
+      const path = encodeURIComponent(code);
+      const url = "/api/v1/codes/" + path + "?" + new URLSearchParams({ lang });
+      $("lookup-meta").textContent = "GET " + url;
+      try {
+        const res = await fetch(url);
+        const text = await res.text();
+        let data;
+        try {
+          data = JSON.parse(text);
+        } catch {
+          data = text;
+        }
+        $("lookup-json").textContent = typeof data === "string" ? data : JSON.stringify(data, null, 2);
+        $("lookup-json").hidden = false;
+        $("lookup-meta").innerHTML =
+          '<span class="status ' + (res.ok ? "ok" : "err") + '">' + res.status + " " + res.statusText + "</span>";
+        if (res.ok && data && typeof data === "object") {
+          const bc = fmtHierarchy(data.hierarchy);
+          $("lookup-summary").innerHTML =
+            "<div class=\"hit\"><strong><code>" + escapeHtml(data.code) + "</code></strong> niveau " + data.level +
+            "<br/>" + escapeHtml(data.description) +
+            (bc ? '<div class="breadcrumb">' + escapeHtml(bc) + "</div>" : "") +
+            "</div>";
+          $("lookup-summary").hidden = false;
+        }
+      } catch (e) {
+        $("lookup-meta").innerHTML = '<span class="status err">Erreur réseau</span>';
+        $("lookup-json").textContent = String(e);
+        $("lookup-json").hidden = false;
+      }
+    });
+
+    $("btn-reload").addEventListener("click", async () => {
+      const token = $("reload-token").value.trim();
+      $("reload-meta").textContent = "";
+      $("reload-json").hidden = true;
+      const headers = { Accept: "application/json" };
+      if (token) headers["X-Reload-Token"] = token;
+      try {
+        const res = await fetch("/api/v1/admin/reload", { method: "POST", headers });
+        const data = await res.json();
+        $("reload-json").textContent = JSON.stringify(data, null, 2);
+        $("reload-json").hidden = false;
+        $("reload-meta").innerHTML =
+          '<span class="status ' + (res.ok ? "ok" : "err") + '">' + res.status + " " + res.statusText + "</span>" +
+          " — " + escapeHtml(data.status || "");
+      } catch (e) {
+        $("reload-meta").innerHTML = '<span class="status err">Erreur réseau</span>';
+        $("reload-json").textContent = String(e);
+        $("reload-json").hidden = false;
+      }
+    });
+
+    function escapeHtml(s) {
+      if (s == null) return "";
+      return String(s)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+  </script>
+</body>
+</html>

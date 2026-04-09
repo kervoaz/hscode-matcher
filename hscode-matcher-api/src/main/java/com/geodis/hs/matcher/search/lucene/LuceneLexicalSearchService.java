@@ -5,6 +5,7 @@ import com.geodis.hs.matcher.domain.Language;
 import com.geodis.hs.matcher.ingestion.NomenclatureRegistry;
 import com.geodis.hs.matcher.search.LexicalHit;
 import com.geodis.hs.matcher.search.LexicalSearchOutcome;
+import com.geodis.hs.matcher.search.LexicalSearchParams;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -32,11 +33,6 @@ import org.apache.lucene.search.TopDocs;
  */
 public final class LuceneLexicalSearchService {
 
-    private static final int MAX_QUERY_LENGTH = 512;
-    private static final int FUZZY_MAX_EXPANSIONS = 120;
-    private static final float FUZZY_BOOST = 4.0f;
-    private static final int MIN_FUZZY_TOKEN_LENGTH = 3;
-
     private final Map<Language, LanguageSearchIndex> indexes;
 
     public LuceneLexicalSearchService(Map<Language, LanguageSearchIndex> indexes) {
@@ -53,18 +49,25 @@ public final class LuceneLexicalSearchService {
     }
 
     public LexicalSearchOutcome search(Language language, String queryText, int limit) throws IOException {
+        return search(language, queryText, limit, LexicalSearchParams.DEFAULT);
+    }
+
+    public LexicalSearchOutcome search(Language language, String queryText, int limit, LexicalSearchParams params)
+            throws IOException {
+        LexicalSearchParams p = params.normalized();
         if (queryText == null || queryText.isBlank()) {
             return new LexicalSearchOutcome(List.of(), 0);
         }
         String q = queryText.trim();
-        if (q.length() > MAX_QUERY_LENGTH) {
-            q = q.substring(0, MAX_QUERY_LENGTH);
+        int maxLen = p.maxQueryChars();
+        if (q.length() > maxLen) {
+            q = q.substring(0, maxLen);
         }
         LanguageSearchIndex idx = indexes.get(language);
         if (idx == null) {
             return new LexicalSearchOutcome(List.of(), 0);
         }
-        BuiltLexicalQuery built = buildQuery(idx.analyzer(), q);
+        BuiltLexicalQuery built = buildQuery(idx.analyzer(), q, p);
         if (built.query() instanceof MatchNoDocsQuery) {
             return new LexicalSearchOutcome(List.of(), built.fuzzyTokenCount());
         }
@@ -89,23 +92,27 @@ public final class LuceneLexicalSearchService {
         return new LexicalSearchOutcome(Collections.unmodifiableList(out), built.fuzzyTokenCount());
     }
 
-    private static BuiltLexicalQuery buildQuery(Analyzer analyzer, String text) throws IOException {
-        FuzzyPart fuzzyPart = buildFuzzyPart(analyzer, text);
+    private static BuiltLexicalQuery buildQuery(Analyzer analyzer, String text, LexicalSearchParams p)
+            throws IOException {
+        FuzzyPart fuzzyPart =
+                p.fuzzy() ? buildFuzzyPart(analyzer, text, p) : new FuzzyPart(new MatchNoDocsQuery(), 0);
         Query fuzzyQuery = fuzzyPart.query();
         int fuzzyTokenCount = fuzzyPart.tokenCount();
 
         BooleanQuery.Builder top = new BooleanQuery.Builder();
         int parts = 0;
-        if (!(fuzzyQuery instanceof MatchNoDocsQuery)) {
-            top.add(new BoostQuery(fuzzyQuery, FUZZY_BOOST), BooleanClause.Occur.SHOULD);
+        if (p.fuzzy() && !(fuzzyQuery instanceof MatchNoDocsQuery)) {
+            top.add(new BoostQuery(fuzzyQuery, p.fuzzyBoost()), BooleanClause.Occur.SHOULD);
             parts++;
         }
 
-        SimpleQueryParser sqp = new SimpleQueryParser(analyzer, java.util.Map.of("description", 1.0f));
-        Query parsed = sqp.parse(text);
-        if (!(parsed instanceof MatchNoDocsQuery)) {
-            top.add(parsed, BooleanClause.Occur.SHOULD);
-            parts++;
+        if (p.bm25()) {
+            SimpleQueryParser sqp = new SimpleQueryParser(analyzer, java.util.Map.of("description", 1.0f));
+            Query parsed = sqp.parse(text);
+            if (!(parsed instanceof MatchNoDocsQuery)) {
+                top.add(parsed, BooleanClause.Occur.SHOULD);
+                parts++;
+            }
         }
 
         if (parts == 0) {
@@ -119,20 +126,22 @@ public final class LuceneLexicalSearchService {
 
     private record FuzzyPart(Query query, int tokenCount) {}
 
-    private static FuzzyPart buildFuzzyPart(Analyzer analyzer, String text) throws IOException {
+    private static FuzzyPart buildFuzzyPart(Analyzer analyzer, String text, LexicalSearchParams p)
+            throws IOException {
         List<FuzzyQuery> terms = new ArrayList<>();
+        int minLen = p.minFuzzyTokenLength();
+        int prefixLen = p.fuzzyPrefixLength();
+        int maxExp = p.fuzzyMaxExpansions();
         try (TokenStream ts = analyzer.tokenStream("description", text)) {
             CharTermAttribute termAttr = ts.addAttribute(CharTermAttribute.class);
             ts.reset();
             while (ts.incrementToken()) {
                 String tok = termAttr.toString();
-                if (tok.length() < MIN_FUZZY_TOKEN_LENGTH) {
+                if (tok.length() < minLen) {
                     continue;
                 }
-                int maxEdits = tok.length() >= 6 ? 2 : 1;
-                terms.add(
-                        new FuzzyQuery(
-                                new Term("description", tok), maxEdits, 1, FUZZY_MAX_EXPANSIONS, true));
+                int maxEdits = tok.length() >= 6 ? p.maxEditsLong() : p.maxEditsShort();
+                terms.add(new FuzzyQuery(new Term("description", tok), maxEdits, prefixLen, maxExp, true));
             }
             ts.end();
         }

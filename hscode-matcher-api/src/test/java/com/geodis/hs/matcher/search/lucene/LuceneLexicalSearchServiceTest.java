@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.geodis.hs.matcher.domain.Language;
 import com.geodis.hs.matcher.ingestion.NomenclatureRegistryBuilder;
 import com.geodis.hs.matcher.ingestion.RawNomenclatureRow;
+import com.geodis.hs.matcher.search.LexicalSearchParams;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -59,6 +60,57 @@ class LuceneLexicalSearchServiceTest {
             assertThat(out.fuzzyTerms()).isEqualTo(1);
             assertThat(out.hits()).isNotEmpty();
             assertThat(out.hits().get(0).entry().code()).isEqualTo("010129");
+        } finally {
+            index.close();
+        }
+    }
+
+    @Test
+    void bm25OnlyDoesNotCorrectTypo() throws Exception {
+        List<RawNomenclatureRow> rows =
+                List.of(
+                        new RawNomenclatureRow("0100000000", 2, Language.EN, "LIVE ANIMALS"),
+                        new RawNomenclatureRow("0101000000", 4, Language.EN, "Live horses, asses and hinnies"),
+                        new RawNomenclatureRow("0101210000", 6, Language.EN, "Horses pure-bred breeding"));
+
+        var registry = NomenclatureRegistryBuilder.build(rows, Language.EN);
+        Analyzer analyzer = LuceneAnalyzers.forLanguage(Language.EN);
+        Directory directory = LuceneNomenclatureIndexer.build(registry, analyzer);
+        LanguageSearchIndex index = new LanguageSearchIndex(Language.EN, registry, analyzer, directory);
+        try {
+            Map<Language, LanguageSearchIndex> map = new EnumMap<>(Language.class);
+            map.put(Language.EN, index);
+            var service = new LuceneLexicalSearchService(map);
+            var params =
+                    new LexicalSearchParams(false, true, 4.0f, 3, 120, 1, 1, 2, 512).normalized();
+            var out = service.search(Language.EN, "horsses", 5, params);
+            assertThat(out.fuzzyTerms()).isZero();
+            assertThat(out.hits()).isEmpty();
+        } finally {
+            index.close();
+        }
+    }
+
+    @Test
+    void fuzzyOnlyStillMatchesTypo() throws Exception {
+        List<RawNomenclatureRow> rows =
+                List.of(
+                        new RawNomenclatureRow("0100000000", 2, Language.EN, "LIVE ANIMALS"),
+                        new RawNomenclatureRow("0101000000", 4, Language.EN, "Live horses, asses and hinnies"),
+                        new RawNomenclatureRow("0101210000", 6, Language.EN, "Horses pure-bred breeding"));
+
+        var registry = NomenclatureRegistryBuilder.build(rows, Language.EN);
+        Analyzer analyzer = LuceneAnalyzers.forLanguage(Language.EN);
+        Directory directory = LuceneNomenclatureIndexer.build(registry, analyzer);
+        LanguageSearchIndex index = new LanguageSearchIndex(Language.EN, registry, analyzer, directory);
+        try {
+            Map<Language, LanguageSearchIndex> map = new EnumMap<>(Language.class);
+            map.put(Language.EN, index);
+            var service = new LuceneLexicalSearchService(map);
+            var params =
+                    new LexicalSearchParams(true, false, 4.0f, 3, 120, 1, 1, 2, 512).normalized();
+            var out = service.search(Language.EN, "horsses", 5, params);
+            assertThat(out.hits()).isNotEmpty();
         } finally {
             index.close();
         }

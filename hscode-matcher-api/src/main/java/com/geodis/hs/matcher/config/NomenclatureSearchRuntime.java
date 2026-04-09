@@ -3,6 +3,7 @@ package com.geodis.hs.matcher.config;
 import com.geodis.hs.matcher.domain.Language;
 import com.geodis.hs.matcher.ingestion.NomenclatureRegistry;
 import com.geodis.hs.matcher.search.LexicalSearchOutcome;
+import com.geodis.hs.matcher.search.LexicalSearchParams;
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
@@ -40,11 +41,16 @@ public class NomenclatureSearchRuntime implements DisposableBean {
     }
 
     public LexicalSearchOutcome search(Language language, String queryText, int limit) throws IOException {
+        return search(language, queryText, limit, LexicalSearchParams.DEFAULT);
+    }
+
+    public LexicalSearchOutcome search(
+            Language language, String queryText, int limit, LexicalSearchParams params) throws IOException {
         NomenclatureIndexBundle b = bundleRef.get();
         if (b == null) {
             return new LexicalSearchOutcome(List.of(), 0);
         }
-        return b.lexicalSearchService().search(language, queryText, limit);
+        return b.lexicalSearchService().search(language, queryText, limit, params);
     }
 
     public boolean anyLanguageReady() {
