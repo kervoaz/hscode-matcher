@@ -92,6 +92,29 @@ class LuceneLexicalSearchServiceTest {
     }
 
     @Test
+    void frenchAsciiQueryMatchesAccentedText() throws Exception {
+        List<RawNomenclatureRow> rows =
+                List.of(
+                        new RawNomenclatureRow("2205000000", 6, Language.FR, "Vins de Xérès ou de Montilla"),
+                        new RawNomenclatureRow("2205100000", 6, Language.FR, "Autre ligne"));
+
+        var registry = NomenclatureRegistryBuilder.build(rows, Language.FR);
+        Analyzer analyzer = LuceneAnalyzers.forLanguage(Language.FR);
+        Directory directory = LuceneNomenclatureIndexer.build(registry, analyzer);
+        LanguageSearchIndex index = new LanguageSearchIndex(Language.FR, registry, analyzer, directory);
+        try {
+            Map<Language, LanguageSearchIndex> map = new EnumMap<>(Language.class);
+            map.put(Language.FR, index);
+            var service = new LuceneLexicalSearchService(map);
+            var out = service.search(Language.FR, "xeres", 5);
+            assertThat(out.hits()).isNotEmpty();
+            assertThat(out.hits().get(0).entry().code()).isEqualTo("220500");
+        } finally {
+            index.close();
+        }
+    }
+
+    @Test
     void fuzzyOnlyStillMatchesTypo() throws Exception {
         List<RawNomenclatureRow> rows =
                 List.of(

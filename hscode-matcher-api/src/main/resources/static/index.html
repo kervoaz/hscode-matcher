@@ -84,6 +84,7 @@
     .status { font-weight: 600; }
     .status.ok { color: var(--ok); }
     .status.err { color: var(--err); }
+    .status.muted { color: var(--muted); font-weight: normal; }
     .hits { margin-top: 0.75rem; }
     .hit {
       border-left: 3px solid var(--accent);
@@ -93,6 +94,19 @@
       border-radius: 0 6px 6px 0;
     }
     .hit code { color: #9cdcfe; }
+    .hit.hit-parent {
+      border-left-color: #6b8e23;
+      opacity: 0.95;
+    }
+    .badge-parent {
+      display: inline-block;
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #b8c87a;
+      margin-right: 0.35rem;
+    }
     .breadcrumb { font-size: 0.8rem; color: var(--muted); margin-top: 0.25rem; }
     details.tuning-details {
       margin-top: 0.5rem;
@@ -238,6 +252,37 @@
   <script>
     const $ = (id) => document.getElementById(id);
 
+    const SEARCH_DEBOUNCE_MS = 280;
+    const LOOKUP_DEBOUNCE_MS = 280;
+    let searchDebounceTimer = null;
+    let lookupDebounceTimer = null;
+    let searchAbort = null;
+    let lookupAbort = null;
+
+    function scheduleSearch(immediate) {
+      if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+      if (immediate) {
+        runSearch();
+        return;
+      }
+      searchDebounceTimer = setTimeout(() => {
+        searchDebounceTimer = null;
+        runSearch();
+      }, SEARCH_DEBOUNCE_MS);
+    }
+
+    function scheduleLookup(immediate) {
+      if (lookupDebounceTimer) clearTimeout(lookupDebounceTimer);
+      if (immediate) {
+        runLookup();
+        return;
+      }
+      lookupDebounceTimer = setTimeout(() => {
+        lookupDebounceTimer = null;
+        runLookup();
+      }, LOOKUP_DEBOUNCE_MS);
+    }
+
     function defaultTuning() {
       $("t-fuzzy").checked = true;
       $("t-bm25").checked = true;
@@ -249,7 +294,10 @@
       $("t-maxEditsLong").value = "2";
       $("t-maxQueryChars").value = "512";
     }
-    $("btn-tuning-reset").addEventListener("click", defaultTuning);
+    $("btn-tuning-reset").addEventListener("click", () => {
+      defaultTuning();
+      scheduleSearch(true);
+    });
 
     function buildSearchQueryParams() {
       const p = new URLSearchParams();
@@ -282,7 +330,11 @@
       $("search-hits").hidden = true;
       $("search-json").hidden = true;
       if (!q) {
-        $("search-meta").innerHTML = '<span class="status err">Requête vide</span>';
+        $("search-meta").innerHTML = '<span class="status muted">Requête vide</span>';
+        if (searchAbort) {
+          searchAbort.abort();
+          searchAbort = null;
+        }
         return;
       }
       if (!$("t-fuzzy").checked && !$("t-bm25").checked) {
@@ -290,11 +342,16 @@
           '<span class="status err">Activez au moins <code>fuzzy</code> ou <code>bm25</code></span>';
         return;
       }
+      if (searchAbort) searchAbort.abort();
+      searchAbort = new AbortController();
+      const ac = searchAbort;
       const url = "/api/v1/search?" + buildSearchQueryParams().toString();
       $("search-meta").textContent = "GET " + url;
       try {
-        const res = await fetch(url);
+        const res = await fetch(url, { signal: ac.signal });
+        if (ac.signal.aborted) return;
         const data = await res.json();
+        if (ac.signal.aborted) return;
         $("search-json").textContent = JSON.stringify(data, null, 2);
         $("search-json").hidden = false;
         let extra = "";
@@ -318,10 +375,20 @@
           }
         }
         if (res.ok && Array.isArray(data.results) && data.results.length) {
+          const nLex = data.results.filter((r) => r.matchType === "LEXICAL").length;
+          const nPar = data.results.length - nLex;
+          if (nPar > 0) {
+            $("search-meta").innerHTML +=
+              " — <span title=\"lignes chapitre / sous-positions ajoutées\">" +
+              data.results.length + " lignes (" + nLex + " lexicales, " + nPar + " parents)</span>";
+          }
           $("search-hits").innerHTML = data.results.map((r) => {
             const bc = fmtHierarchy(r.hierarchy);
+            const parent = r.matchType === "PARENT_CONTEXT";
             return (
-              '<div class="hit"><strong><code>' + escapeHtml(r.code) + "</code></strong> " +
+              '<div class="hit' + (parent ? " hit-parent" : "") + '">' +
+              (parent ? '<span class="badge-parent">Parent</span>' : "") +
+              "<strong><code>" + escapeHtml(r.code) + "</code></strong> " +
               "(niveau " + r.level + ", score " + (typeof r.score === "number" ? r.score.toFixed(4) : r.score) + ", " +
               escapeHtml(r.matchType) + ")<br/>" + escapeHtml(r.description) +
               (bc ? '<div class="breadcrumb">' + escapeHtml(bc) + "</div>" : "") +
@@ -331,33 +398,63 @@
           $("search-hits").hidden = false;
         }
       } catch (e) {
+        if (e.name === "AbortError") return;
         $("search-meta").innerHTML = '<span class="status err">Erreur réseau</span>';
         $("search-json").textContent = String(e);
         $("search-json").hidden = false;
       }
     }
 
-    $("btn-search").addEventListener("click", runSearch);
+    $("btn-search").addEventListener("click", () => scheduleSearch(true));
+    $("q").addEventListener("input", () => scheduleSearch(false));
     $("q").addEventListener("keydown", (ev) => {
-      if (ev.key === "Enter") runSearch();
+      if (ev.key === "Enter") scheduleSearch(true);
+    });
+    ["lang-s", "limit"].forEach((id) => {
+      $(id).addEventListener("change", () => scheduleSearch(true));
+    });
+    $("limit").addEventListener("input", () => scheduleSearch(false));
+    ["t-fuzzy", "t-bm25"].forEach((id) => {
+      $(id).addEventListener("change", () => scheduleSearch(true));
+    });
+    [
+      "t-fuzzyBoost",
+      "t-minFuzzyTokenLength",
+      "t-fuzzyMaxExpansions",
+      "t-fuzzyPrefixLength",
+      "t-maxEditsShort",
+      "t-maxEditsLong",
+      "t-maxQueryChars",
+    ].forEach((id) => {
+      $(id).addEventListener("input", () => scheduleSearch(false));
+      $(id).addEventListener("change", () => scheduleSearch(true));
     });
 
-    $("btn-lookup").addEventListener("click", async () => {
+    async function runLookup() {
       const code = $("code").value.trim();
       const lang = $("lang-l").value;
       $("lookup-meta").textContent = "";
       $("lookup-summary").hidden = true;
       $("lookup-json").hidden = true;
       if (!code) {
-        $("lookup-meta").innerHTML = '<span class="status err">Code vide</span>';
+        $("lookup-meta").innerHTML = '<span class="status muted">Code vide</span>';
+        if (lookupAbort) {
+          lookupAbort.abort();
+          lookupAbort = null;
+        }
         return;
       }
+      if (lookupAbort) lookupAbort.abort();
+      lookupAbort = new AbortController();
+      const ac = lookupAbort;
       const path = encodeURIComponent(code);
       const url = "/api/v1/codes/" + path + "?" + new URLSearchParams({ lang });
       $("lookup-meta").textContent = "GET " + url;
       try {
-        const res = await fetch(url);
+        const res = await fetch(url, { signal: ac.signal });
+        if (ac.signal.aborted) return;
         const text = await res.text();
+        if (ac.signal.aborted) return;
         let data;
         try {
           data = JSON.parse(text);
@@ -378,11 +475,16 @@
           $("lookup-summary").hidden = false;
         }
       } catch (e) {
+        if (e.name === "AbortError") return;
         $("lookup-meta").innerHTML = '<span class="status err">Erreur réseau</span>';
         $("lookup-json").textContent = String(e);
         $("lookup-json").hidden = false;
       }
-    });
+    }
+
+    $("btn-lookup").addEventListener("click", () => scheduleLookup(true));
+    $("code").addEventListener("input", () => scheduleLookup(false));
+    $("lang-l").addEventListener("change", () => scheduleLookup(true));
 
     $("btn-reload").addEventListener("click", async () => {
       const token = $("reload-token").value.trim();

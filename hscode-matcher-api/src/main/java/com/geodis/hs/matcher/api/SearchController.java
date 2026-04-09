@@ -5,6 +5,7 @@ import com.geodis.hs.matcher.api.dto.SearchResponse;
 import com.geodis.hs.matcher.domain.Language;
 import com.geodis.hs.matcher.config.NomenclatureSearchRuntime;
 import com.geodis.hs.matcher.search.HierarchyResolver;
+import com.geodis.hs.matcher.search.HierarchySearchAugmenter;
 import com.geodis.hs.matcher.search.LexicalHit;
 import com.geodis.hs.matcher.search.LexicalSearchParams;
 import java.io.IOException;
@@ -80,10 +81,10 @@ public class SearchController {
         var outcome = searchRuntime.search(language, q, lim, tuning);
         List<LexicalHit> hits = outcome.hits();
         var reg = searchRuntime.registry(language).orElseThrow();
-        List<MatchRow> rows = new ArrayList<>(hits.size());
+        List<MatchRow> lexicalRows = new ArrayList<>(hits.size());
         for (LexicalHit h : hits) {
             var e = h.entry();
-            rows.add(
+            lexicalRows.add(
                     new MatchRow(
                             e.code(),
                             e.level(),
@@ -92,6 +93,7 @@ public class SearchController {
                             "LEXICAL",
                             HierarchyResolver.resolve(reg, e)));
         }
+        List<MatchRow> rows = HierarchySearchAugmenter.withParentCategories(reg, lexicalRows);
         return ResponseEntity.ok(
                 new SearchResponse(
                         q.trim(),
