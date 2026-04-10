@@ -1,0 +1,113 @@
+# Pipeline unique : build / tests (CI) puis image Docker → ACR (CD).
+# Prérequis CD : service connection Docker Registry vers l’ACR (voir variables ci-dessous).
+#
+# La CD ne s’exécute pas sur les PR (évite de pousser une image pour chaque PR).
+# Pour la lancer aussi sur les PR, retirer ou adapter `condition` sur le stage Container.
+
+trigger:
+  branches:
+    include:
+      - main
+      - develop
+
+pr:
+  branches:
+    include:
+      - '*'
+
+variables:
+  MAVEN_CACHE_FOLDER: $(Pipeline.Workspace)/.m2/repository
+  MAVEN_OPTS: '-Dmaven.repo.local=$(MAVEN_CACHE_FOLDER)'
+  ACR_SERVICE_CONNECTION: acr-hscode-matcher
+  IMAGE_REPOSITORY: hscode-matcher-api
+
+stages:
+  - stage: Build
+    displayName: Build and test
+    jobs:
+      - job: maven
+        displayName: Maven verify
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - checkout: self
+            fetchDepth: 0
+
+          - task: Cache@2
+            displayName: Cache Maven local repo
+            inputs:
+              key: 'maven | "$(Agent.OS)" | hscode-matcher-api/pom.xml'
+              restoreKeys: |
+                maven | "$(Agent.OS)"
+              path: $(MAVEN_CACHE_FOLDER)
+
+          - task: UseJavaVersion@1
+            displayName: Use Java 17
+            inputs:
+              versionSpec: '17'
+              jdkArchitectureOption: x64
+
+          - script: chmod +x mvnw && ./mvnw -B -ntp verify
+            displayName: Maven verify
+            workingDirectory: hscode-matcher-api
+
+          - task: PublishTestResults@2
+            displayName: Publish unit test results
+            condition: always()
+            inputs:
+              testResultsFormat: JUnit
+              testResultsFiles: '**/surefire-reports/TEST-*.xml'
+              searchFolder: $(System.DefaultWorkingDirectory)/hscode-matcher-api
+              mergeTestResults: true
+              failTaskOnFailedTests: true
+
+          - task: CopyFiles@2
+            displayName: Stage runnable JAR
+            inputs:
+              SourceFolder: hscode-matcher-api/target
+              Contents: 'hscode-matcher-api-*.jar'
+              TargetFolder: $(Build.ArtifactStagingDirectory)/jar
+              flattenFolders: true
+
+          - task: PublishPipelineArtifact@1
+            displayName: Publish JAR artifact
+            inputs:
+              targetPath: $(Build.ArtifactStagingDirectory)/jar
+              artifact: matcher-api-jar
+              publishLocation: pipeline
+
+  - stage: Container
+    displayName: Build and push image
+    dependsOn: Build
+    condition: and(succeeded(), in(variables['Build.SourceBranch'], 'refs/heads/main', 'refs/heads/develop'))
+    jobs:
+      - job: docker_build_push
+        displayName: Docker build and push to ACR
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - checkout: self
+            fetchDepth: 1
+
+          - download: current
+            artifact: matcher-api-jar
+            displayName: Download JAR from this run
+
+          - script: |
+              set -euo pipefail
+              mkdir -p "$(Build.SourcesDirectory)/docker/context"
+              JAR="$(ls "$(Pipeline.Workspace)/matcher-api-jar/"hscode-matcher-api-*.jar | head -1)"
+              cp "$JAR" "$(Build.SourcesDirectory)/docker/context/app.jar"
+            displayName: Place JAR for Docker context
+
+          - task: Docker@2
+            displayName: Build and push
+            inputs:
+              containerRegistry: $(ACR_SERVICE_CONNECTION)
+              repository: $(IMAGE_REPOSITORY)
+              command: buildAndPush
+              Dockerfile: docker/Dockerfile
+              buildContext: docker/context
+              tags: |
+                $(Build.BuildId)
+                latest
