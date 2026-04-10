@@ -2,6 +2,13 @@
 hscode-matcher-api/target/
 **/.flattened-pom.xml
 
+# ONNX weights (GitHub max 100 MB per file; fetch from HuggingFace for local dev)
+hscode-matcher-api/src/main/resources/onnx/*.onnx
+hscode-matcher-api/src/test/resources/onnx/*.onnx
+
+# Local embedding caches (generated; do not commit)
+hscode-matcher-api/tmp/*.embedding-cache
+
 # IDE / OS
 .idea/
 *.iml
