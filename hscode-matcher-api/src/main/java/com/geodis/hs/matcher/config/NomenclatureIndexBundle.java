@@ -3,12 +3,17 @@ package com.geodis.hs.matcher.config;
 import com.geodis.hs.matcher.domain.Language;
 import com.geodis.hs.matcher.ingestion.NomenclatureIntegrityValidator;
 import com.geodis.hs.matcher.ingestion.NomenclatureRegistryBuilder;
+import com.geodis.hs.matcher.ingestion.RawNomenclatureRow;
 import com.geodis.hs.matcher.ingestion.csv.CsvNomenclatureReader;
 import com.geodis.hs.matcher.search.lucene.LanguageSearchIndex;
 import com.geodis.hs.matcher.search.lucene.LuceneAnalyzers;
 import com.geodis.hs.matcher.search.lucene.LuceneLexicalSearchService;
 import com.geodis.hs.matcher.search.lucene.LuceneNomenclatureIndexer;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -61,12 +66,33 @@ public final class NomenclatureIndexBundle implements AutoCloseable {
             log.debug("Skipping {}; no CSV path configured", language);
             return;
         }
-        Path path = Path.of(pathStr).toAbsolutePath().normalize();
-        if (!Files.isRegularFile(path)) {
-            log.warn("Nomenclature CSV not found for {}: {}", language, path);
-            return;
+        List<RawNomenclatureRow> rows;
+        if (pathStr.startsWith("classpath:")) {
+            String loc = pathStr.substring("classpath:".length()).trim();
+            if (loc.startsWith("/")) {
+                loc = loc.substring(1);
+            }
+            ClassLoader cl = Thread.currentThread().getContextClassLoader();
+            if (cl == null) {
+                cl = NomenclatureIndexBundle.class.getClassLoader();
+            }
+            try (InputStream in = cl.getResourceAsStream(loc)) {
+                if (in == null) {
+                    log.warn("Nomenclature CSV not found on classpath for {}: {}", language, pathStr);
+                    return;
+                }
+                try (Reader reader = new InputStreamReader(in, StandardCharsets.UTF_8)) {
+                    rows = CsvNomenclatureReader.readAll(reader);
+                }
+            }
+        } else {
+            Path path = Path.of(pathStr).toAbsolutePath().normalize();
+            if (!Files.isRegularFile(path)) {
+                log.warn("Nomenclature CSV not found for {}: {}", language, path);
+                return;
+            }
+            rows = CsvNomenclatureReader.readAll(path);
         }
-        var rows = CsvNomenclatureReader.readAll(path);
         var registry = NomenclatureRegistryBuilder.build(rows, language);
         NomenclatureIntegrityValidator.validate(registry, NomenclatureIntegrityValidator.Expectations.euCircabcFullExport());
         Analyzer analyzer = LuceneAnalyzers.forLanguage(language);
@@ -74,7 +100,7 @@ public final class NomenclatureIndexBundle implements AutoCloseable {
         LanguageSearchIndex index = new LanguageSearchIndex(language, registry, analyzer, directory);
         map.put(language, index);
         closeList.add(index);
-        log.info("Loaded nomenclature for {} from {} ({} entries)", language, path, registry.size());
+        log.info("Loaded nomenclature for {} from {} ({} entries)", language, pathStr, registry.size());
     }
 
     public LuceneLexicalSearchService lexicalSearchService() {

@@ -1,7 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
@@ -22,8 +20,8 @@
         <!-- Phase 3a: pin when implementing Lucene indexes -->
         <lucene.version>9.12.1</lucene.version>
         <!-- exec-maven-plugin: use -Dexec.in=... -Dexec.out=... (PowerShell-safe; no spaces in one -D). -->
-        <exec.in></exec.in>
-        <exec.out></exec.out>
+        <exec.in/>
+        <exec.out/>
     </properties>
 
     <dependencies>
@@ -86,6 +84,36 @@
                         <argument>${exec.in}</argument>
                         <argument>${exec.out}</argument>
                     </arguments>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>com.microsoft.azure</groupId>
+                <artifactId>azure-webapp-maven-plugin</artifactId>
+                <version>2.14.1</version>
+                <configuration>
+                    <schemaVersion>v2</schemaVersion>
+                    <subscriptionId>81137eb5-dd50-4359-9106-2665988acac3</subscriptionId>
+                    <resourceGroup>MPN-rg-geodis</resourceGroup>
+                    <appName>hscode-matcher</appName>
+                    <pricingTier>F1</pricingTier>
+                    <region>francecentral</region>
+                    <appServicePlanName>exfabrica-java-micro</appServicePlanName>
+                    <appServicePlanResourceGroup>MPN-rg-geodis</appServicePlanResourceGroup>
+                    <runtime>
+                        <os>Linux</os>
+                        <javaVersion>Java 17</javaVersion>
+                        <webContainer>Java SE</webContainer>
+                    </runtime>
+                    <deployment>
+                        <resources>
+                            <resource>
+                                <directory>${project.basedir}/target</directory>
+                                <includes>
+                                    <include>*.jar</include>
+                                </includes>
+                            </resource>
+                        </resources>
+                    </deployment>
                 </configuration>
             </plugin>
         </plugins>

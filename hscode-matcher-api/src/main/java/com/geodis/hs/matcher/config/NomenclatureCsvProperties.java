@@ -5,7 +5,9 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "nomenclature.csv")
 public class NomenclatureCsvProperties {
 
-    /** Filesystem path to UTF-8 CSV exported from {@code NomenclatureEN.XLSX}. */
+    /**
+     * UTF-8 CSV: {@code classpath:nomenclature/nomenclature-en.csv} or an absolute filesystem path.
+     */
     private String en = "";
 
     private String fr = "";
