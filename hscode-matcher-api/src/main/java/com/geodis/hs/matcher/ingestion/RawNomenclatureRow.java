@@ -2,7 +2,7 @@ package com.geodis.hs.matcher.ingestion;
 
 import com.geodis.hs.matcher.domain.Language;
 
-/** One raw row from EU nomenclature export (XLSX or CSV), before folding CN subdivisions into HS6. */
+/** One raw row from EU nomenclature export (XLSX or CSV). */
 public record RawNomenclatureRow(
         String tenDigitGoodsCode,
         int hierarchyPosition,

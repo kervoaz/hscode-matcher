@@ -40,4 +40,24 @@ class HierarchyResolverTest {
         assertThat(h.heading()).isNull();
         assertThat(h.siblingSubheadings()).isEmpty();
     }
+
+    @Test
+    void cn8LevelIncludesHeadingAndHs6Peers() {
+        List<RawNomenclatureRow> rows =
+                List.of(
+                        new RawNomenclatureRow("0100000000", 2, Language.EN, "LIVE ANIMALS"),
+                        new RawNomenclatureRow("0101000000", 4, Language.EN, "Live horses"),
+                        new RawNomenclatureRow("0101210000", 6, Language.EN, "Horses A"),
+                        new RawNomenclatureRow("0101290000", 6, Language.EN, "Horses B"),
+                        new RawNomenclatureRow("0101210000", 8, Language.EN, "CN8 line"));
+
+        var reg = NomenclatureRegistryBuilder.build(rows, Language.EN);
+        var cn8 = reg.get("01012100").orElseThrow();
+        var h = HierarchyResolver.resolve(reg, cn8);
+
+        assertThat(h.chapter()).isNotNull().extracting(c -> c.code()).isEqualTo("01");
+        assertThat(h.heading()).isNotNull().extracting(x -> x.code()).isEqualTo("0101");
+        assertThat(h.siblingSubheadings()).hasSize(1);
+        assertThat(h.siblingSubheadings().get(0).code()).isEqualTo("010129");
+    }
 }

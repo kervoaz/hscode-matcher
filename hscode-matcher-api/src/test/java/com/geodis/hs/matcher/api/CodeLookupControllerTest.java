@@ -64,6 +64,30 @@ class CodeLookupControllerTest {
     }
 
     @Test
+    void lookup_tenDigit_ok() throws Exception {
+        Language en = Language.EN;
+        Map<String, HsEntry> map = new LinkedHashMap<>();
+        map.put("22", new HsEntry("22", 2, "Beverages", en, null));
+        map.put("2204", new HsEntry("2204", 4, "Wine", en, "22"));
+        map.put("220429", new HsEntry("220429", 6, "Other grape wine", en, "2204"));
+        map.put("22042986", new HsEntry("22042986", 8, "Sherry line", en, "220429"));
+        map.put(
+                "2204298610",
+                new HsEntry("2204298610", 10, "Strength band A", en, "22042986"));
+        NomenclatureRegistry reg = new NomenclatureRegistry(en, map);
+
+        when(searchRuntime.isReady(en)).thenReturn(true);
+        when(searchRuntime.registry(en)).thenReturn(Optional.of(reg));
+
+        mockMvc.perform(get("/api/v1/codes/2204.29.86.10").param("lang", "EN"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("2204298610"))
+                .andExpect(jsonPath("$.level").value(10))
+                .andExpect(jsonPath("$.hierarchy.chapter.code").value("22"))
+                .andExpect(jsonPath("$.hierarchy.heading.code").value("2204"));
+    }
+
+    @Test
     void lookup_badCodeFormat_returns400() throws Exception {
         mockMvc.perform(get("/api/v1/codes/12345").param("lang", "EN"))
                 .andExpect(status().isBadRequest());

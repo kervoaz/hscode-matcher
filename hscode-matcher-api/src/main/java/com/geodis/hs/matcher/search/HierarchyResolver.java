@@ -24,8 +24,22 @@ public final class HierarchyResolver {
             case 2 -> new MatchHierarchy(ref(entry), null, List.of());
             case 4 -> resolveHeading(registry, entry);
             case 6 -> resolveSubheading(registry, entry);
+            case 8, 10 -> resolveCnSubdivision(registry, entry);
             default -> new MatchHierarchy(null, null, List.of());
         };
+    }
+
+    /**
+     * CN8 / CN10 hits: same chapter, heading, and HS6 peer list as the HS6 prefix of the code (code
+     * prefixes are ground truth).
+     */
+    private static MatchHierarchy resolveCnSubdivision(NomenclatureRegistry registry, HsEntry entry) {
+        String code = entry.code();
+        if (code.length() < 6) {
+            return new MatchHierarchy(null, null, List.of());
+        }
+        String six = code.substring(0, 6);
+        return resolveSubheadingContext(registry, six);
     }
 
     private static MatchHierarchy resolveHeading(NomenclatureRegistry registry, HsEntry heading) {
@@ -38,20 +52,30 @@ public final class HierarchyResolver {
     }
 
     private static MatchHierarchy resolveSubheading(NomenclatureRegistry registry, HsEntry sub) {
-        String headingCode = sub.parentCode();
-        if (headingCode == null) {
+        if (sub.parentCode() == null) {
             return new MatchHierarchy(null, null, List.of());
         }
+        return resolveSubheadingContext(registry, sub.code());
+    }
+
+    /** {@code sixDigitCode} must be a 6-character HS subheading key. */
+    private static MatchHierarchy resolveSubheadingContext(NomenclatureRegistry registry, String sixDigitCode) {
+        if (sixDigitCode.length() < 6) {
+            return new MatchHierarchy(null, null, List.of());
+        }
+        HsEntry sub = registry.get(sixDigitCode).orElse(null);
+        String headingCode =
+                sub != null && sub.parentCode() != null ? sub.parentCode() : sixDigitCode.substring(0, 4);
         HsEntry heading = registry.get(headingCode).orElse(null);
         NodeRef headingRef = heading == null ? null : ref(heading);
         NodeRef chapterRef = null;
         if (heading != null && heading.parentCode() != null) {
             chapterRef = registry.get(heading.parentCode()).map(HierarchyResolver::ref).orElse(null);
         }
-        if (chapterRef == null && sub.code().length() >= 2) {
-            chapterRef = registry.get(sub.code().substring(0, 2)).map(HierarchyResolver::ref).orElse(null);
+        if (chapterRef == null) {
+            chapterRef = registry.get(sixDigitCode.substring(0, 2)).map(HierarchyResolver::ref).orElse(null);
         }
-        List<NodeRef> siblings = listSubheadingsUnderHeading(registry, headingCode, sub.code());
+        List<NodeRef> siblings = listSubheadingsUnderHeading(registry, headingCode, sixDigitCode);
         return new MatchHierarchy(chapterRef, headingRef, siblings);
     }
 

@@ -6,7 +6,7 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
 
-/** Immutable in-memory HS nomenclature for one language (2/4/6-digit keys; CN text folded into HS6). */
+/** Immutable in-memory HS/CN nomenclature for one language (registry keys: 2/4/6/8/10 digits). */
 public final class NomenclatureRegistry {
 
     private final Language language;

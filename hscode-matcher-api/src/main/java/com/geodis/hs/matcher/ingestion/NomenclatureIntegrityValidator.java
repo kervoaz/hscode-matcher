@@ -48,7 +48,7 @@ public final class NomenclatureIntegrityValidator {
                     registry.get(e.parentCode())
                             .orElseThrow(
                                     () -> new NomenclatureIngestException("Missing parent " + e.parentCode() + " for " + e.code()));
-            int expectParentLevel = e.level() == 4 ? 2 : 4;
+            int expectParentLevel = e.level() - 2;
             if (parent.level() != expectParentLevel) {
                 throw new NomenclatureIngestException(
                         "Wrong parent level for "

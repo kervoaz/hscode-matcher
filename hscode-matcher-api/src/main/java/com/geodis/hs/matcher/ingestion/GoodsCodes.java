@@ -5,9 +5,8 @@ import java.util.Optional;
 /**
  * Parses EU TARIC/CN "Goods code" cells (10-digit base plus optional suffix such as {@code " 80"}).
  *
- * <p>Hierarchy for HS v1 uses the leading digits of that 10-digit code: chapter (2), heading (4),
- * subheading (6). Rows with hierarchy position 8 or 10 are national/CN subdivisions; their text is
- * folded into the 6-digit HS bucket for search.
+ * <p>Registry keys use the leading digits of that 10-digit code: chapter (2), heading (4), HS
+ * subheading (6), CN subdivision (8), and CN code (10).
  */
 public final class GoodsCodes {
 
@@ -52,13 +51,17 @@ public final class GoodsCodes {
         return ten;
     }
 
-    /** HS-style key: 2, 4, or 6 digits derived from the 10-digit goods code and hierarchy position. */
+    /**
+     * Registry key derived from the 10-digit goods code and hierarchy position (2, 4, 6, 8, or 10
+     * digits).
+     */
     public static String hsKey(int hierarchyPosition, String tenDigitGoodsCode) {
         return switch (hierarchyPosition) {
             case 2 -> tenDigitGoodsCode.substring(0, 2);
             case 4 -> tenDigitGoodsCode.substring(0, 4);
             case 6 -> tenDigitGoodsCode.substring(0, 6);
-            case 8, 10 -> tenDigitGoodsCode.substring(0, 6);
+            case 8 -> tenDigitGoodsCode.substring(0, 8);
+            case 10 -> tenDigitGoodsCode;
             default -> throw new IllegalArgumentException("Unsupported hierarchy position: " + hierarchyPosition);
         };
     }
@@ -68,7 +71,9 @@ public final class GoodsCodes {
             case 2 -> 2;
             case 4 -> 4;
             case 6 -> 6;
-            default -> throw new IllegalArgumentException("HS key must be 2, 4, or 6 digits, got: " + hsKey.length());
+            case 8 -> 8;
+            case 10 -> 10;
+            default -> throw new IllegalArgumentException("HS key must be 2, 4, 6, 8, or 10 digits, got: " + hsKey.length());
         };
     }
 
@@ -77,16 +82,18 @@ public final class GoodsCodes {
             case 2 -> null;
             case 4 -> hsKey.substring(0, 2);
             case 6 -> hsKey.substring(0, 4);
-            default -> throw new IllegalArgumentException("level must be 2, 4, or 6");
+            case 8 -> hsKey.substring(0, 6);
+            case 10 -> hsKey.substring(0, 8);
+            default -> throw new IllegalArgumentException("level must be 2, 4, 6, 8, or 10");
         };
     }
 
     public static boolean isValidHsKey(String code) {
-        return code != null && code.matches("\\d{2}|\\d{4}|\\d{6}");
+        return code != null && code.matches("\\d{2}|\\d{4}|\\d{6}|\\d{8}|\\d{10}");
     }
 
     /**
-     * Normalizes user or URL input to an HS registry key (2, 4, or 6 digits). Strips all
+     * Normalizes user or URL input to a registry key (2, 4, 6, 8, or 10 digits). Strips all
      * non-digits (dots, spaces, etc.).
      *
      * @return empty if there are no digits or the digit count is not valid for HS v1

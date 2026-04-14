@@ -28,8 +28,8 @@ public class CodeLookupController {
     }
 
     /**
-     * Returns the nomenclature line and hierarchy for a known HS key. {@code code} may contain
-     * punctuation; digits are extracted and must form a 2-, 4-, or 6-digit key.
+     * Returns the nomenclature line and hierarchy for a known registry key. {@code code} may contain
+     * punctuation; digits are extracted and must form a 2-, 4-, 6-, 8-, or 10-digit key.
      */
     @GetMapping("/codes/{code}")
     public ResponseEntity<CodeLookupResponse> lookup(
