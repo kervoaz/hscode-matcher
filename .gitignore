@@ -9,6 +9,10 @@ hscode-matcher-api/src/test/resources/onnx/*.onnx
 # Local embedding caches (generated; do not commit)
 hscode-matcher-api/tmp/*.embedding-cache
 
+# Bulk chapter-classify output (dev); keep .gitkeep
+rest-client/out/*
+!rest-client/out/.gitkeep
+
 # IDE / OS
 .idea/
 *.iml

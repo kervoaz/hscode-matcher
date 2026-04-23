@@ -1,0 +1,14 @@
+{
+  "rest-client.environmentVariables": {
+    "$shared": {
+      "reloadToken": ""
+    },
+    "local": {
+      "baseUrl": "http://127.0.0.1:8080"
+    },
+    "local-18080": {
+      "baseUrl": "http://127.0.0.1:18080"
+    }
+  },
+  "java.compile.nullAnalysis.mode": "automatic"
+}

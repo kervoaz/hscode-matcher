@@ -41,12 +41,17 @@ public final class NomenclatureIndexBundle implements AutoCloseable {
     }
 
     public static NomenclatureIndexBundle load(NomenclatureCsvProperties props) throws IOException {
+        return load(props, null);
+    }
+
+    public static NomenclatureIndexBundle load(
+            NomenclatureCsvProperties props, LexicalSearchRankProperties ranking) throws IOException {
         EnumMap<Language, LanguageSearchIndex> map = new EnumMap<>(Language.class);
         List<LanguageSearchIndex> closeList = new ArrayList<>();
         tryLoad(props.getEn(), Language.EN, map, closeList);
         tryLoad(props.getFr(), Language.FR, map, closeList);
         tryLoad(props.getDe(), Language.DE, map, closeList);
-        LuceneLexicalSearchService service = new LuceneLexicalSearchService(map);
+        LuceneLexicalSearchService service = new LuceneLexicalSearchService(map, ranking);
         if (map.isEmpty()) {
             log.warn(
                     "No nomenclature CSV loaded; set nomenclature.csv.{en,fr,de} (UTF-8 export). Search will return no results.");

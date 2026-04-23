@@ -23,11 +23,16 @@ public class NomenclatureSearchRuntime implements DisposableBean {
     private static final Logger log = LoggerFactory.getLogger(NomenclatureSearchRuntime.class);
 
     private final NomenclatureCsvProperties csvProperties;
+    private final LexicalSearchRankProperties lexicalSearchRankProperties;
     private final AtomicReference<NomenclatureIndexBundle> bundleRef;
 
-    public NomenclatureSearchRuntime(NomenclatureCsvProperties csvProperties) throws IOException {
+    public NomenclatureSearchRuntime(
+            NomenclatureCsvProperties csvProperties, LexicalSearchRankProperties lexicalSearchRankProperties)
+            throws IOException {
         this.csvProperties = csvProperties;
-        this.bundleRef = new AtomicReference<>(NomenclatureIndexBundle.load(csvProperties));
+        this.lexicalSearchRankProperties = lexicalSearchRankProperties;
+        this.bundleRef =
+                new AtomicReference<>(NomenclatureIndexBundle.load(csvProperties, lexicalSearchRankProperties));
     }
 
     public boolean isReady(Language language) {
@@ -63,7 +68,7 @@ public class NomenclatureSearchRuntime implements DisposableBean {
      * On failure the previous bundle remains active.
      */
     public synchronized void reload() throws IOException {
-        NomenclatureIndexBundle next = NomenclatureIndexBundle.load(csvProperties);
+        NomenclatureIndexBundle next = NomenclatureIndexBundle.load(csvProperties, lexicalSearchRankProperties);
         NomenclatureIndexBundle prev = bundleRef.getAndSet(next);
         if (prev != null) {
             prev.close();

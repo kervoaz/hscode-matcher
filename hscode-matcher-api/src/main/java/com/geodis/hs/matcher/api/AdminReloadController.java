@@ -3,6 +3,7 @@ package com.geodis.hs.matcher.api;
 import com.geodis.hs.matcher.api.dto.AdminReloadResponse;
 import com.geodis.hs.matcher.config.NomenclatureAdminProperties;
 import com.geodis.hs.matcher.config.NomenclatureSearchRuntime;
+import com.geodis.hs.matcher.embed.ChapterEmbeddingIndex;
 import java.io.IOException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -17,10 +18,15 @@ public class AdminReloadController {
 
     private final NomenclatureSearchRuntime searchRuntime;
     private final NomenclatureAdminProperties adminProperties;
+    private final ChapterEmbeddingIndex chapterEmbeddingIndex;
 
-    public AdminReloadController(NomenclatureSearchRuntime searchRuntime, NomenclatureAdminProperties adminProperties) {
+    public AdminReloadController(
+            NomenclatureSearchRuntime searchRuntime,
+            NomenclatureAdminProperties adminProperties,
+            ChapterEmbeddingIndex chapterEmbeddingIndex) {
         this.searchRuntime = searchRuntime;
         this.adminProperties = adminProperties;
+        this.chapterEmbeddingIndex = chapterEmbeddingIndex;
     }
 
     @PostMapping("/reload")
@@ -35,6 +41,7 @@ public class AdminReloadController {
         }
         try {
             searchRuntime.reload();
+            chapterEmbeddingIndex.invalidate();
             return ResponseEntity.ok(AdminReloadResponse.reloaded(searchRuntime.anyLanguageReady()));
         } catch (IOException e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)

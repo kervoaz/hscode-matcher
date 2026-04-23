@@ -1,9 +1,11 @@
 package com.geodis.hs.matcher.search.lucene;
 
+import com.geodis.hs.matcher.config.LexicalSearchRankProperties;
 import com.geodis.hs.matcher.domain.HsEntry;
 import com.geodis.hs.matcher.domain.Language;
 import com.geodis.hs.matcher.ingestion.NomenclatureRegistry;
 import com.geodis.hs.matcher.search.LexicalHit;
+import com.geodis.hs.matcher.search.LexicalRanking;
 import com.geodis.hs.matcher.search.LexicalSearchOutcome;
 import com.geodis.hs.matcher.search.LexicalSearchParams;
 import java.io.IOException;
@@ -34,9 +36,16 @@ import org.apache.lucene.search.TopDocs;
 public final class LuceneLexicalSearchService {
 
     private final Map<Language, LanguageSearchIndex> indexes;
+    private final LexicalSearchRankProperties ranking;
 
     public LuceneLexicalSearchService(Map<Language, LanguageSearchIndex> indexes) {
+        this(indexes, null);
+    }
+
+    public LuceneLexicalSearchService(
+            Map<Language, LanguageSearchIndex> indexes, LexicalSearchRankProperties ranking) {
         this.indexes = Map.copyOf(indexes);
+        this.ranking = ranking;
     }
 
     public boolean isReady(Language language) {
@@ -72,8 +81,9 @@ public final class LuceneLexicalSearchService {
             return new LexicalSearchOutcome(List.of(), built.fuzzyTokenCount());
         }
         IndexSearcher searcher = idx.searcher();
-        TopDocs top = searcher.search(built.query(), Math.max(1, limit));
-        List<LexicalHit> out = new ArrayList<>();
+        int collect = LexicalRanking.luceneCollectCount(limit, ranking);
+        TopDocs top = searcher.search(built.query(), Math.max(1, collect));
+        List<LexicalHit> raw = new ArrayList<>();
         for (ScoreDoc sd : top.scoreDocs) {
             var doc = searcher.storedFields().document(sd.doc);
             String code = doc.get("code");
@@ -84,11 +94,9 @@ public final class LuceneLexicalSearchService {
             if (entry == null) {
                 continue;
             }
-            out.add(new LexicalHit(entry, sd.score));
-            if (out.size() >= limit) {
-                break;
-            }
+            raw.add(new LexicalHit(entry, sd.score));
         }
+        List<LexicalHit> out = LexicalRanking.rerankByDepth(raw, limit, ranking);
         return new LexicalSearchOutcome(Collections.unmodifiableList(out), built.fuzzyTokenCount());
     }
 

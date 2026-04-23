@@ -99,4 +99,33 @@ class HierarchySearchAugmenterTest {
         assertThat(headingRows).isEqualTo(1);
         assertThat(out.stream().filter(r -> "01".equals(r.code())).count()).isEqualTo(1);
     }
+
+    @Test
+    void parentContextScoreFactor_reducesAncestorScores() {
+        List<RawNomenclatureRow> rows =
+                List.of(
+                        new RawNomenclatureRow("0100000000", 2, Language.EN, "LIVE ANIMALS"),
+                        new RawNomenclatureRow("0101000000", 4, Language.EN, "Live horses"),
+                        new RawNomenclatureRow("0101210000", 6, Language.EN, "Horses A"));
+
+        var reg = NomenclatureRegistryBuilder.build(rows, Language.EN);
+        var lexical =
+                List.of(
+                        new MatchRow(
+                                "010121",
+                                6,
+                                "Horses A",
+                                10.0,
+                                "LEXICAL",
+                                HierarchyResolver.resolve(reg, reg.get("010121").orElseThrow())));
+
+        List<MatchRow> out = HierarchySearchAugmenter.withParentCategories(reg, lexical, 0.5);
+
+        MatchRow chapterParent =
+                out.stream()
+                        .filter(r -> "01".equals(r.code()) && HierarchySearchAugmenter.PARENT_CONTEXT.equals(r.matchType()))
+                        .findFirst()
+                        .orElseThrow();
+        assertThat(chapterParent.score()).isEqualTo(5.0);
+    }
 }

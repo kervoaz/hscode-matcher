@@ -36,9 +36,19 @@ public final class HierarchySearchAugmenter {
      */
     public static List<MatchRow> withParentCategories(
             NomenclatureRegistry registry, List<MatchRow> lexicalRows) {
+        return withParentCategories(registry, lexicalRows, 1.0);
+    }
+
+    /**
+     * @param parentContextScoreFactor multiplier applied only to {@link #PARENT_CONTEXT} rows (e.g.
+     *     {@code 0.88} so direct lexical hits rank above ancestor lines inferred from descendants).
+     */
+    public static List<MatchRow> withParentCategories(
+            NomenclatureRegistry registry, List<MatchRow> lexicalRows, double parentContextScoreFactor) {
         if (lexicalRows.isEmpty()) {
             return List.of();
         }
+        double parentFactor = Math.max(0.0, parentContextScoreFactor);
         Set<String> directCodes = new HashSet<>();
         for (MatchRow r : lexicalRows) {
             directCodes.add(r.code());
@@ -59,7 +69,12 @@ public final class HierarchySearchAugmenter {
         }
         List<MatchRow> parents = new ArrayList<>(parentEntries.size());
         for (Map.Entry<String, Double> e : parentEntries) {
-            registry.get(e.getKey()).ifPresent(ent -> parents.add(toParentRow(registry, ent, e.getValue())));
+            registry.get(e.getKey())
+                    .ifPresent(
+                            ent ->
+                                    parents.add(
+                                            toParentRow(
+                                                    registry, ent, e.getValue() * parentFactor)));
         }
         List<MatchRow> merged = new ArrayList<>(lexicalRows.size() + parents.size());
         merged.addAll(lexicalRows);

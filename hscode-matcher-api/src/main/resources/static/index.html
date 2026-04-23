@@ -208,6 +208,36 @@
           <button type="button" class="secondary" id="btn-tuning-reset">Réinitialiser les défauts</button>
         </div>
       </details>
+      <details class="tuning-details" id="display-level-details">
+        <summary>Affichage des niveaux HS</summary>
+        <p class="meta" style="margin:0 0 0.5rem;">
+          Cochez les niveaux à <strong>afficher</strong> dans les résultats et le fil d’Ariane. Ex. uniquement chapitre (2) ou chapitre + position (2 et 4).
+        </p>
+        <div class="check-row">
+          <input type="checkbox" id="disp-lvl-2" data-level="2" checked />
+          <label for="disp-lvl-2">Chapitre (2 chiffres)</label>
+        </div>
+        <div class="check-row">
+          <input type="checkbox" id="disp-lvl-4" data-level="4" checked />
+          <label for="disp-lvl-4">Position / heading (4)</label>
+        </div>
+        <div class="check-row">
+          <input type="checkbox" id="disp-lvl-6" data-level="6" checked />
+          <label for="disp-lvl-6">HS6 (6)</label>
+        </div>
+        <div class="check-row">
+          <input type="checkbox" id="disp-lvl-8" data-level="8" checked />
+          <label for="disp-lvl-8">CN8 (8)</label>
+        </div>
+        <div class="check-row">
+          <input type="checkbox" id="disp-lvl-10" data-level="10" checked />
+          <label for="disp-lvl-10">CN10 (10)</label>
+        </div>
+        <div class="row" style="margin-top:0.65rem; margin-bottom:0;">
+          <button type="button" class="secondary" id="btn-level-display-all">Tout afficher</button>
+          <button type="button" class="secondary" id="btn-level-display-chapter-only">Chapitre seul (2)</button>
+        </div>
+      </details>
       <div class="meta" id="search-meta"></div>
       <div class="hits" id="search-hits" hidden></div>
       <pre id="search-json" hidden></pre>
@@ -258,6 +288,65 @@
     let lookupDebounceTimer = null;
     let searchAbort = null;
     let lookupAbort = null;
+    /** Dernière réponse recherche OK (re-rendu filtre niveau sans refetch). */
+    let lastSearchPayload = null;
+    /** Dernière réponse lookup OK. */
+    let lastLookupPayload = null;
+
+    const LEVEL_DISPLAY_CHECKBOX_IDS = ["disp-lvl-2", "disp-lvl-4", "disp-lvl-6", "disp-lvl-8", "disp-lvl-10"];
+    const LS_VISIBLE_LEVELS = "hs-matcher-ui-visible-levels";
+
+    function getVisibleLevelsSet() {
+      const s = new Set();
+      for (const id of LEVEL_DISPLAY_CHECKBOX_IDS) {
+        const el = $(id);
+        if (el && el.checked) s.add(Number(el.dataset.level));
+      }
+      return s;
+    }
+
+    function saveVisibleLevelsToStorage() {
+      const arr = [];
+      for (const id of LEVEL_DISPLAY_CHECKBOX_IDS) {
+        const el = $(id);
+        if (el && el.checked) arr.push(Number(el.dataset.level));
+      }
+      try {
+        localStorage.setItem(LS_VISIBLE_LEVELS, JSON.stringify(arr));
+      } catch (_) {
+        /* ignore */
+      }
+    }
+
+    function loadVisibleLevelsFromStorage() {
+      let raw;
+      try {
+        raw = localStorage.getItem(LS_VISIBLE_LEVELS);
+      } catch (_) {
+        return;
+      }
+      if (!raw) return;
+      let arr;
+      try {
+        arr = JSON.parse(raw);
+      } catch (_) {
+        return;
+      }
+      if (!Array.isArray(arr) || !arr.length) return;
+      const want = new Set(arr.map(Number).filter((n) => !Number.isNaN(n)));
+      for (const id of LEVEL_DISPLAY_CHECKBOX_IDS) {
+        const el = $(id);
+        if (!el) continue;
+        const lv = Number(el.dataset.level);
+        el.checked = want.has(lv);
+      }
+    }
+
+    function refreshLevelFilteredViews() {
+      saveVisibleLevelsToStorage();
+      if (lastSearchPayload) paintSearchResults(lastSearchPayload.data, lastSearchPayload.res);
+      if (lastLookupPayload) paintLookupSummary(lastLookupPayload.data, lastLookupPayload.res);
+    }
 
     function scheduleSearch(immediate) {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -299,6 +388,25 @@
       scheduleSearch(true);
     });
 
+    $("btn-level-display-all").addEventListener("click", () => {
+      LEVEL_DISPLAY_CHECKBOX_IDS.forEach((id) => {
+        const el = $(id);
+        if (el) el.checked = true;
+      });
+      refreshLevelFilteredViews();
+    });
+    $("btn-level-display-chapter-only").addEventListener("click", () => {
+      LEVEL_DISPLAY_CHECKBOX_IDS.forEach((id) => {
+        const el = $(id);
+        if (el) el.checked = id === "disp-lvl-2";
+      });
+      refreshLevelFilteredViews();
+    });
+    LEVEL_DISPLAY_CHECKBOX_IDS.forEach((id) => {
+      const el = $(id);
+      if (el) el.addEventListener("change", () => refreshLevelFilteredViews());
+    });
+
     function buildSearchQueryParams() {
       const p = new URLSearchParams();
       p.set("q", $("q").value.trim());
@@ -316,12 +424,113 @@
       return p;
     }
 
-    function fmtHierarchy(h) {
+    /**
+     * @param {object|null} h — MatchHierarchy JSON
+     * @param {Set<number>|null} visibleLevels — si null, tout afficher
+     */
+    function fmtHierarchy(h, visibleLevels) {
       if (!h) return "";
+      const vis = visibleLevels instanceof Set ? visibleLevels : null;
+      const allow = (lvl) => vis == null || vis.has(lvl);
       const parts = [];
-      if (h.chapter) parts.push(h.chapter.code + " — " + h.chapter.description);
-      if (h.heading) parts.push(h.heading.code + " — " + h.heading.description);
+      if (h.chapter) {
+        const lv = typeof h.chapter.level === "number" ? h.chapter.level : 2;
+        if (allow(lv)) parts.push(h.chapter.code + " — " + h.chapter.description);
+      }
+      if (h.heading) {
+        const lv = typeof h.heading.level === "number" ? h.heading.level : 4;
+        if (allow(lv)) parts.push(h.heading.code + " — " + h.heading.description);
+      }
+      if (Array.isArray(h.siblingSubheadings) && h.siblingSubheadings.length) {
+        const showSibs = allow(6);
+        if (showSibs) {
+          const sibBits = h.siblingSubheadings
+            .filter((s) => {
+              const lv = typeof s.level === "number" ? s.level : 6;
+              return vis == null || vis.has(lv);
+            })
+            .map((s) => s.code + " — " + s.description);
+          if (sibBits.length) parts.push("HS6 (pairs): " + sibBits.join(" · "));
+        }
+      }
       return parts.join(" → ");
+    }
+
+    /**
+     * Met à jour méta + liste des hits à partir d’une réponse déjà reçue.
+     */
+    function paintSearchResults(data, res) {
+      const visible = getVisibleLevelsSet();
+      let extra = "";
+      if (res.ok && data.tuning) {
+        const t = data.tuning;
+        extra =
+          " — <span title=\"tuning appliqué (voir JSON)\">fuzzy:" + t.fuzzy +
+          " bm25:" + t.bm25 + " boost:" + t.fuzzyBoost + "</span>";
+      }
+      $("search-meta").innerHTML =
+        '<span class="status ' + (res.ok ? "ok" : "err") + '">' + res.status + " " + res.statusText + "</span>" +
+        (res.ok
+          ? " — clauses fuzzy (requête): " + data.fuzzyEnabled + ", termes: " + data.fuzzyTerms
+          : "") +
+        extra;
+      if (!res.ok) {
+        const errMsg = data.detail || data.message || data.title;
+        if (errMsg) {
+          $("search-meta").innerHTML +=
+            ' — <span class="status err">' + escapeHtml(errMsg) + "</span>";
+        }
+        $("search-hits").innerHTML = "";
+        $("search-hits").hidden = true;
+        return;
+      }
+      if (visible.size === 0) {
+        $("search-meta").innerHTML +=
+          ' — <span class="status err">Cochez au moins un niveau dans « Affichage des niveaux HS »</span>';
+        $("search-hits").innerHTML = "";
+        $("search-hits").hidden = true;
+        return;
+      }
+      if (Array.isArray(data.results) && data.results.length) {
+        const raw = data.results;
+        const filtered = raw.filter((r) => visible.has(r.level));
+        const hidden = raw.length - filtered.length;
+        if (hidden > 0) {
+          $("search-meta").innerHTML +=
+            ' — <span title="résultats exclus par le filtre niveau">' + hidden + " masqué(s) (niveau)</span>";
+        }
+        if (filtered.length) {
+          const nLex = filtered.filter((r) => r.matchType === "LEXICAL").length;
+          const nPar = filtered.length - nLex;
+          if (nPar > 0) {
+            $("search-meta").innerHTML +=
+              " — <span title=\"lignes chapitre / sous-positions ajoutées\">" +
+              filtered.length + " lignes affichées (" + nLex + " lexicales, " + nPar + " parents)</span>";
+          }
+          $("search-hits").innerHTML = filtered.map((r) => {
+            const bc = fmtHierarchy(r.hierarchy, visible);
+            const parent = r.matchType === "PARENT_CONTEXT";
+            return (
+              '<div class="hit' + (parent ? " hit-parent" : "") + '">' +
+              (parent ? '<span class="badge-parent">Parent</span>' : "") +
+              "<strong><code>" + escapeHtml(r.code) + "</code></strong> " +
+              "(niveau " + r.level + ", score " + (typeof r.score === "number" ? r.score.toFixed(4) : r.score) + ", " +
+              escapeHtml(r.matchType) + ")<br/>" + escapeHtml(r.description) +
+              (bc ? '<div class="breadcrumb">' + escapeHtml(bc) + "</div>" : "") +
+              "</div>"
+            );
+          }).join("");
+          $("search-hits").hidden = false;
+        } else {
+          $("search-meta").innerHTML +=
+            ' — <span class="status muted">Aucune ligne aux niveaux sélectionnés (' + raw.length + " reçue(s))</span>";
+          $("search-hits").innerHTML = "";
+          $("search-hits").hidden = true;
+        }
+      } else {
+        $("search-hits").innerHTML = "";
+        $("search-hits").hidden = true;
+      }
     }
 
     async function runSearch() {
@@ -329,6 +538,7 @@
       $("search-meta").textContent = "";
       $("search-hits").hidden = true;
       $("search-json").hidden = true;
+      lastSearchPayload = null;
       if (!q) {
         $("search-meta").innerHTML = '<span class="status muted">Requête vide</span>';
         if (searchAbort) {
@@ -354,49 +564,8 @@
         if (ac.signal.aborted) return;
         $("search-json").textContent = JSON.stringify(data, null, 2);
         $("search-json").hidden = false;
-        let extra = "";
-        if (res.ok && data.tuning) {
-          const t = data.tuning;
-          extra =
-            " — <span title=\"tuning appliqué (voir JSON)\">fuzzy:" + t.fuzzy +
-            " bm25:" + t.bm25 + " boost:" + t.fuzzyBoost + "</span>";
-        }
-        $("search-meta").innerHTML =
-          '<span class="status ' + (res.ok ? "ok" : "err") + '">' + res.status + " " + res.statusText + "</span>" +
-          (res.ok
-            ? " — clauses fuzzy (requête): " + data.fuzzyEnabled + ", termes: " + data.fuzzyTerms
-            : "") +
-          extra;
-        if (!res.ok) {
-          const errMsg = data.detail || data.message || data.title;
-          if (errMsg) {
-            $("search-meta").innerHTML +=
-              ' — <span class="status err">' + escapeHtml(errMsg) + "</span>";
-          }
-        }
-        if (res.ok && Array.isArray(data.results) && data.results.length) {
-          const nLex = data.results.filter((r) => r.matchType === "LEXICAL").length;
-          const nPar = data.results.length - nLex;
-          if (nPar > 0) {
-            $("search-meta").innerHTML +=
-              " — <span title=\"lignes chapitre / sous-positions ajoutées\">" +
-              data.results.length + " lignes (" + nLex + " lexicales, " + nPar + " parents)</span>";
-          }
-          $("search-hits").innerHTML = data.results.map((r) => {
-            const bc = fmtHierarchy(r.hierarchy);
-            const parent = r.matchType === "PARENT_CONTEXT";
-            return (
-              '<div class="hit' + (parent ? " hit-parent" : "") + '">' +
-              (parent ? '<span class="badge-parent">Parent</span>' : "") +
-              "<strong><code>" + escapeHtml(r.code) + "</code></strong> " +
-              "(niveau " + r.level + ", score " + (typeof r.score === "number" ? r.score.toFixed(4) : r.score) + ", " +
-              escapeHtml(r.matchType) + ")<br/>" + escapeHtml(r.description) +
-              (bc ? '<div class="breadcrumb">' + escapeHtml(bc) + "</div>" : "") +
-              "</div>"
-            );
-          }).join("");
-          $("search-hits").hidden = false;
-        }
+        if (res.ok) lastSearchPayload = { data, res };
+        paintSearchResults(data, res);
       } catch (e) {
         if (e.name === "AbortError") return;
         $("search-meta").innerHTML = '<span class="status err">Erreur réseau</span>';
@@ -430,12 +599,37 @@
       $(id).addEventListener("change", () => scheduleSearch(true));
     });
 
+    function paintLookupSummary(data, res) {
+      const visible = getVisibleLevelsSet();
+      if (!res.ok || !data || typeof data !== "object") {
+        $("lookup-summary").hidden = true;
+        return;
+      }
+      if (visible.size === 0) {
+        $("lookup-summary").innerHTML =
+          "<div class=\"hit\"><span class=\"status err\">Cochez au moins un niveau dans « Affichage des niveaux HS »</span></div>";
+        $("lookup-summary").hidden = false;
+        return;
+      }
+      const bc = fmtHierarchy(data.hierarchy, visible);
+      const lvlOk = visible.has(data.level);
+      const dim = lvlOk ? "" : " style=\"opacity:0.55\"";
+      $("lookup-summary").innerHTML =
+        "<div class=\"hit\"" + dim + "><strong><code>" + escapeHtml(data.code) + "</code></strong> niveau " + data.level +
+        (lvlOk ? "" : " <span class=\"status muted\">(hors niveaux cochés pour le filtre résultats)</span>") +
+        "<br/>" + escapeHtml(data.description) +
+        (bc ? '<div class="breadcrumb">' + escapeHtml(bc) + "</div>" : "") +
+        "</div>";
+      $("lookup-summary").hidden = false;
+    }
+
     async function runLookup() {
       const code = $("code").value.trim();
       const lang = $("lang-l").value;
       $("lookup-meta").textContent = "";
       $("lookup-summary").hidden = true;
       $("lookup-json").hidden = true;
+      lastLookupPayload = null;
       if (!code) {
         $("lookup-meta").innerHTML = '<span class="status muted">Code vide</span>';
         if (lookupAbort) {
@@ -465,15 +659,8 @@
         $("lookup-json").hidden = false;
         $("lookup-meta").innerHTML =
           '<span class="status ' + (res.ok ? "ok" : "err") + '">' + res.status + " " + res.statusText + "</span>";
-        if (res.ok && data && typeof data === "object") {
-          const bc = fmtHierarchy(data.hierarchy);
-          $("lookup-summary").innerHTML =
-            "<div class=\"hit\"><strong><code>" + escapeHtml(data.code) + "</code></strong> niveau " + data.level +
-            "<br/>" + escapeHtml(data.description) +
-            (bc ? '<div class="breadcrumb">' + escapeHtml(bc) + "</div>" : "") +
-            "</div>";
-          $("lookup-summary").hidden = false;
-        }
+        if (res.ok && data && typeof data === "object") lastLookupPayload = { data, res };
+        paintLookupSummary(data, res);
       } catch (e) {
         if (e.name === "AbortError") return;
         $("lookup-meta").innerHTML = '<span class="status err">Erreur réseau</span>';
@@ -485,6 +672,8 @@
     $("btn-lookup").addEventListener("click", () => scheduleLookup(true));
     $("code").addEventListener("input", () => scheduleLookup(false));
     $("lang-l").addEventListener("change", () => scheduleLookup(true));
+
+    loadVisibleLevelsFromStorage();
 
     $("btn-reload").addEventListener("click", async () => {
       const token = $("reload-token").value.trim();

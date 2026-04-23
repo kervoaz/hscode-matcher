@@ -1,0 +1,94 @@
+# =============================================================================
+# E2E — Bulk chapter classify (REST Client / humao.rest-client)
+# =============================================================================
+# Prérequis :
+#   - Workspace = racine HSCODE (recommandé) ou adapter les chemins `< …` ci-dessous.
+#   - {{baseUrl}} : défini par les variables de fichier ci-dessous (fonctionne avec « No Environment »).
+#     Extension humao.rest-client : voir aussi .vscode/settings.json (rest-client.environmentVariables).
+#     JetBrains / Visual Studio (.http) : voir rest-client/http-client.env.json.
+#   - API démarrée : cd hscode-matcher-api && mvn spring-boot:run -Pdev
+#     (nomenclature CSV selon application-dev.properties ; sinon 503 sur classify).
+#
+# Ordre conseillé pour un smoke E2E : health → search → runs → JSON sample → CSV sample.
+# =============================================================================
+
+# Si vous sélectionnez l’environnement « local-18080 » dans la barre de statut REST Client,
+# commentez la ligne @baseUrl suivante (sinon la variable de fichier prime souvent sur l’environnement).
+@baseUrl = http://127.0.0.1:8080
+@reloadToken =
+
+### 0a — Health (actuator)
+GET {{baseUrl}}/actuator/health
+
+### 0b — Nomenclature chargée pour la langue (sinon bulk renvoie 503)
+GET {{baseUrl}}/api/v1/search?q=MOTEUR&lang=FR&limit=3
+
+### 1 — Allouer un runId (chunks / corrélation ; optionnel pour les requêtes simples)
+# @name bulkCreateRun
+POST {{baseUrl}}/api/v1/bulk/chapter-classify/runs
+
+### 2 — JSON — petit lot (réponse application/json, rapide)
+# @name bulkJsonSample
+POST {{baseUrl}}/api/v1/bulk/chapter-classify
+Content-Type: application/json
+
+{
+  "lang": "FR",
+  "searchLimit": 15,
+  "items": [
+    { "id": "e2e-json-1", "description": "MOTEUR" },
+    { "id": "e2e-json-2", "description": "materiel medical" },
+    { "id": "e2e-json-3", "description": "lustre" }
+  ]
+}
+
+### 3 — CSV — fixture légère (E2E rapide, ~5 lignes)
+# Paramètres en query (recommandé Spring) ; corps = uniquement la part fichier.
+# Réponse : text/csv ; en-tête X-Bulk-Output-File si bulk.chapter-classify.output-dir est défini.
+POST {{baseUrl}}/api/v1/bulk/chapter-classify?lang=FR&searchLimit=15
+Content-Type: multipart/form-data; boundary=----HsBulkE2e
+
+------HsBulkE2e
+Content-Disposition: form-data; name="file"; filename="MyGEODIS V1-1.csv"
+Content-Type: text/csv; charset=UTF-8
+
+< ./fixtures/bulk-chapter-sample.csv
+------HsBulkE2e--
+
+### 4 — CSV — même fixture avec runId (query + en-tête, comme les workers parallèles)
+POST {{baseUrl}}/api/v1/bulk/chapter-classify?lang=FR&searchLimit=15&runId={{bulkCreateRun.response.body.runId}}&chunkIndex=0&chunkTotal=1&rowIndexOffset=0
+X-Bulk-Run-Id: {{bulkCreateRun.response.body.runId}}
+Content-Type: multipart/form-data; boundary=----HsBulkE2eRun
+
+------HsBulkE2eRun
+Content-Disposition: form-data; name="file"; filename="MyGEODISV1-1.csv"
+Content-Type: text/csv; charset=UTF-8
+
+< ./MyGEODISV1-1.csv
+------HsBulkE2eRun--
+
+### 5 — CSV — export MyGEODIS complet (long : milliers de lignes ; LLM/embeddings = très lent)
+# Décommenter et lancer seulement si besoin. Chemin relatif depuis ce dossier (rest-client/).
+# POST {{baseUrl}}/api/v1/bulk/chapter-classify?lang=FR&searchLimit=15
+# Content-Type: multipart/form-data; boundary=----HsBulkFull#
+# ------HsBulkFull
+# Content-Disposition: form-data; name="file"; filename="Extraction_MyGEODIS.csv"
+# Content-Type: text/csv; charset=UTF-8
+#
+# < ../Extraction des données MyGEODIS V1-1.csv
+# ------HsBulkFull--
+
+### 6 — CSV — copie locale lourde sous rest-client/ (si vous y avez collé l’export)
+# POST {{baseUrl}}/api/v1/bulk/chapter-classify?lang=FR&searchLimit=15
+# Content-Type: multipart/form-data; boundary=----HsBulkLocal
+#
+# ------HsBulkLocal
+# Content-Disposition: form-data; name="file"; filename="MyGEODIS V1-1.csv"
+# Content-Type: text/csv; charset=UTF-8
+#
+# < ./MyGEODIS V1-1.csv
+# ------HsBulkLocal--
+
+### 7 — Reload nomenclature (optionnel ; token si nomenclature.admin.reload-token est défini)
+# POST {{baseUrl}}/api/v1/admin/reload
+# X-Reload-Token: {{reloadToken}}

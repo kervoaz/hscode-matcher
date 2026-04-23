@@ -3,6 +3,7 @@ package com.geodis.hs.matcher.api;
 import com.geodis.hs.matcher.api.dto.MatchRow;
 import com.geodis.hs.matcher.api.dto.SearchResponse;
 import com.geodis.hs.matcher.domain.Language;
+import com.geodis.hs.matcher.config.LexicalSearchRankProperties;
 import com.geodis.hs.matcher.config.NomenclatureSearchRuntime;
 import com.geodis.hs.matcher.search.HierarchyResolver;
 import com.geodis.hs.matcher.search.HierarchySearchAugmenter;
@@ -27,9 +28,12 @@ public class SearchController {
     private static final int MAX_LIMIT = 50;
 
     private final NomenclatureSearchRuntime searchRuntime;
+    private final LexicalSearchRankProperties lexicalSearchRankProperties;
 
-    public SearchController(NomenclatureSearchRuntime searchRuntime) {
+    public SearchController(
+            NomenclatureSearchRuntime searchRuntime, LexicalSearchRankProperties lexicalSearchRankProperties) {
         this.searchRuntime = searchRuntime;
+        this.lexicalSearchRankProperties = lexicalSearchRankProperties;
     }
 
     @GetMapping("/search")
@@ -93,7 +97,9 @@ public class SearchController {
                             "LEXICAL",
                             HierarchyResolver.resolve(reg, e)));
         }
-        List<MatchRow> rows = HierarchySearchAugmenter.withParentCategories(reg, lexicalRows);
+        List<MatchRow> rows =
+                HierarchySearchAugmenter.withParentCategories(
+                        reg, lexicalRows, lexicalSearchRankProperties.getParentContextScoreFactor());
         return ResponseEntity.ok(
                 new SearchResponse(
                         q.trim(),
